@@ -26,6 +26,21 @@ describe("SpecTable", () => {
     expect(html.match(/<td aria-label="No value"[^>]*>–<\/td>/g)).toHaveLength(3);
   });
 
+  it("takes an optional caption and has a default", () => {
+    const plain = renderToStaticMarkup(createElement(SpecTable, { grid }));
+    expect(plain).toContain('<caption class="sr-only">Specifications</caption>');
+    expect(html).toContain('<caption class="sr-only">Test specs</caption>');
+  });
+
+  it("gives the pinned header cell its own background, and body cells the row's", () => {
+    const header = /<th scope="col" class="([^"]*)">Property<\/th>/.exec(html)?.[1] ?? "";
+    expect(header).toContain("sticky");
+    expect(header).toContain("bg-slate-100");
+    const body = /<th scope="row" class="([^"]*)">Tensile strength<\/th>/.exec(html)?.[1] ?? "";
+    expect(body).toContain("sticky");
+    expect(body).toContain("bg-inherit");
+  });
+
   it("renders nothing for a product without spec rows", () => {
     expect(renderToStaticMarkup(createElement(SpecTable, { grid: { models: ["A"], rows: [] }, caption: "x" }))).toBe("");
   });
@@ -38,6 +53,15 @@ describe("Markdown", () => {
     );
     expect(html).not.toContain("<script");
     expect(html).not.toContain("<img");
+  });
+
+  it("keeps images, code blocks and long words inside the column", () => {
+    const html = renderToStaticMarkup(
+      createElement(Markdown, null, "![wide](https://example.com/a.png)\n\n```\nlong code line\n```"),
+    );
+    expect(html).toMatch(/<img [^>]*class="[^"]*max-w-full[^"]*h-auto|<img [^>]*class="[^"]*h-auto[^"]*max-w-full/);
+    expect(html).toMatch(/<pre class="[^"]*overflow-x-auto/);
+    expect(html).toContain('<div class="break-words ');
   });
 
   it("drops javascript: links and demotes headings below the page heading", () => {

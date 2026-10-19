@@ -47,6 +47,14 @@ function componentsFor(top: number): Components {
       <blockquote className="mt-4 border-l-4 border-orange pl-4 text-slate-600">{children}</blockquote>
     ),
     hr: () => <hr className="my-8 border-slate-200" />,
+    // Admin-written images and code blocks must never widen the page.
+    img: ({ src, alt }) => (
+      // eslint-disable-next-line @next/next/no-img-element -- size unknown, any host
+      <img src={typeof src === "string" ? src : undefined} alt={alt ?? ""} className="mt-4 h-auto max-w-full rounded-md" />
+    ),
+    pre: ({ children }) => (
+      <pre className="mt-4 overflow-x-auto rounded-md bg-slate-100 p-4 text-sm">{children}</pre>
+    ),
     code: ({ children }) => (
       <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[0.9em]">{children}</code>
     ),
@@ -59,7 +67,7 @@ function componentsFor(top: number): Components {
  */
 export function Markdown({ children, topHeading = 3, className = "" }: Props) {
   return (
-    <div className={`text-base leading-relaxed text-slate-700 ${className}`}>
+    <div className={`break-words text-base leading-relaxed text-slate-700 ${className}`}>
       <ReactMarkdown components={componentsFor(topHeading)}>{children}</ReactMarkdown>
     </div>
   );

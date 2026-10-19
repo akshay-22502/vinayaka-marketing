@@ -187,6 +187,35 @@ test.describe("catalogue", () => {
       await expect(scroller).toHaveAttribute("tabindex", "0");
     });
 
+    test("the pinned Property column stays solid and on top while the table scrolls", async ({
+      page,
+    }) => {
+      await page.goto(PRODUCT_PATH);
+      const scroller = page.getByTestId("spec-table-scroll");
+      await scroller.scrollIntoViewIfNeeded();
+      await scroller.evaluate((el) => {
+        el.scrollLeft = 200;
+      });
+      expect(await scroller.evaluate((el) => el.scrollLeft)).toBeGreaterThan(0);
+
+      const table = page.getByRole("table");
+      const headerCell = table.getByRole("columnheader", { name: "Property" });
+      const bodyCell = table.getByRole("rowheader").first();
+      for (const cell of [headerCell, bodyCell]) {
+        // Opaque background, so the cells scrolling underneath do not show through.
+        const background = await cell.evaluate((el) => getComputedStyle(el).backgroundColor);
+        expect(background, "pinned cell background").not.toMatch(/rgba\(.*,\s*0\)|transparent/);
+
+        // And it is the topmost box at its own centre (stacked above the scrolling cells).
+        const onTop = await cell.evaluate((el) => {
+          const box = el.getBoundingClientRect();
+          const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+          return hit === el || el.contains(hit);
+        });
+        expect(onTop, "pinned cell is on top").toBe(true);
+      }
+    });
+
     test("the menu opens and closes with the keyboard", async ({ page }) => {
       await page.goto("/");
       const button = page.getByRole("button", { name: "Menu" });
