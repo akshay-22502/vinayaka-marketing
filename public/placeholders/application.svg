@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" role="img" aria-label="Application placeholder">
+<rect width="800" height="600" fill="#253F70"/>
+<g fill="none" stroke="#D97A3A" stroke-width="8" stroke-linejoin="round" stroke-linecap="round">
+<circle cx="600" cy="150" r="48"/>
+<path d="M0 360C120 270 240 270 340 330S560 360 800 280"/>
+<path d="M0 420C160 360 300 380 420 410S660 420 800 380" stroke-opacity=".6"/>
+<path d="M320 600L370 420M480 600L430 420"/>
+<path d="M400 600V560M400 520V490M400 460V440" stroke-width="6"/>
+</g>
+</svg>

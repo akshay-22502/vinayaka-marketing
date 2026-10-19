@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" role="img" aria-label="Geomembrane placeholder">
+<rect width="800" height="600" fill="#253F70"/>
+<g fill="none" stroke="#D97A3A" stroke-width="8" stroke-linejoin="round" stroke-linecap="round">
+<path d="M190 200H650L560 380H100Z"/>
+<path d="M420 200L330 380M440 200L350 380" stroke-width="5"/>
+<path d="M100 380L60 450H520L560 380" stroke-opacity=".6"/>
+<path d="M110 510q40-30 80 0t80 0t80 0t80 0t80 0t80 0t80 0" stroke-width="5" stroke-opacity=".6"/>
+</g>
+</svg>

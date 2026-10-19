@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" role="img" aria-label="Geogrid placeholder">
+<rect width="800" height="600" fill="#253F70"/>
+<defs><rect id="n" x="-14" y="-14" width="28" height="28" fill="#D97A3A" stroke="none"/></defs>
+<g fill="none" stroke="#D97A3A" stroke-width="8">
+<path d="M160 120H640M160 240H640M160 360H640M160 480H640M160 120V480M280 120V480M400 120V480M520 120V480M640 120V480"/>
+<use href="#n" x="160" y="120"/><use href="#n" x="160" y="240"/><use href="#n" x="160" y="360"/><use href="#n" x="160" y="480"/><use href="#n" x="280" y="120"/><use href="#n" x="280" y="240"/><use href="#n" x="280" y="360"/><use href="#n" x="280" y="480"/><use href="#n" x="400" y="120"/><use href="#n" x="400" y="240"/><use href="#n" x="400" y="360"/><use href="#n" x="400" y="480"/><use href="#n" x="520" y="120"/><use href="#n" x="520" y="240"/><use href="#n" x="520" y="360"/><use href="#n" x="520" y="480"/><use href="#n" x="640" y="120"/><use href="#n" x="640" y="240"/><use href="#n" x="640" y="360"/><use href="#n" x="640" y="480"/>
+</g>
+<path d="M100 540H700" stroke="#D97A3A" stroke-width="4" stroke-opacity=".5"/>
+</svg>
