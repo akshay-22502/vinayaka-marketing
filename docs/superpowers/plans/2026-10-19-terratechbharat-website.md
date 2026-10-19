@@ -23,7 +23,7 @@
 - Insert the quote row before sending any email; email failure never fails the request.
 - Seeded products are `published = false`.
 - Secrets only in env vars, never committed: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`, `MAIL_FROM` (`TerraTechBharat <quotes@terratechbharat.com>`), `NEXT_PUBLIC_TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY`, `IP_HASH_SALT`, `NEXT_PUBLIC_SITE_URL`.
-- Dev fallbacks (needed because the sandbox can't reach Cloudflare or Resend): when `NODE_ENV !== 'production'` and `TURNSTILE_SECRET_KEY` is unset, captcha verification returns true; when `RESEND_API_KEY` is unset, the mailer logs instead of sending. In production, a missing key throws at request time with a 500 and a logged error.
+- Dev fallbacks (needed because the sandbox can't reach Cloudflare or Resend) are enabled only by the explicit env `ALLOW_DEV_FALLBACKS=true` (never set on Vercel; E2E runs `next start`, so NODE_ENV can't be used): then an unset `TURNSTILE_SECRET_KEY` makes captcha verification return true, and an unset `RESEND_API_KEY` makes the mailer log instead of sending. Without the flag, a missing key throws at request time with a 500 and a logged error.
 - Markdown fields render through `react-markdown` without `rehype-raw`. Buyer-supplied text is HTML-escaped in emails and rendered as text in admin.
 
 ## Review Focus
@@ -40,7 +40,7 @@
 
 ```
 .env.example  .gitignore  package.json  tsconfig.json  next.config.ts  postcss.config.mjs
-vitest.config.ts  playwright.config.ts  middleware.ts
+vitest.config.ts  playwright.config.ts  src/middleware.ts
 supabase/config.toml
 supabase/migrations/20261019000001_schema.sql      tables, enums, triggers
 supabase/migrations/20261019000002_security.sql    is_admin(), RLS policies, storage buckets/policies
@@ -88,7 +88,7 @@ README.md                            dev setup + launch runbook
 ### Task 2: Database schema, security and spec-table RPC
 
 **Files:**
-- Create: `supabase/config.toml` (via `npx supabase init`), the three migrations, `tests/db/helpers.ts`, `tests/db/rls.test.ts`
+- Create: `supabase/config.toml` (via `npx supabase init`), the three migrations, `tests/db/helpers.ts`, `tests/db/rls.test.ts`, `scripts/lib/users.ts`
 
 **Interfaces:**
 - Produces tables exactly as in spec §5 (snake_case columns), plus `quote_recipients(country text primary key check (country in ('IN','AE')), email text not null)`.
@@ -100,6 +100,7 @@ README.md                            dev setup + launch runbook
 - Produces `public.is_admin() returns boolean` (security definer, `exists (select 1 from admins where user_id = auth.uid())`).
 - Produces `public.save_spec_table(p_product_id uuid, p_grid jsonb) returns void` (security invoker, raises if not `is_admin()`). It deletes the product's spec rows and reinserts them from `{"models": ["BX1515",...], "rows": [{"name","unit","test_method","values":[...]}]}`, keeping array order as `sort_order`. It runs in one transaction because it is a single function call.
 - Produces storage buckets `public-media` (public) and `quote-attachments` (private), with write policies limited to `is_admin()`.
+- Produces `scripts/lib/users.ts`: `ensureUser(service: SupabaseClient, email: string, password: string, opts: {admin: boolean}): Promise<string>` (creates or reuses the auth user with email confirmed, upserts/removes the `admins` row, returns user id). It is the only user-creation code: `tests/db/helpers.ts`, `scripts/e2e-prepare.ts` (Task 5) and `scripts/create-admin.ts` (Task 10) all call it.
 - Produces `tests/db/helpers.ts`: `anonClient()`, `serviceClient()`, `signedInClient(email, password)`, `createUser(email, password, {admin: boolean})`. All read local Supabase URLs/keys from `npx supabase status -o env`, loaded in `vitest.config.ts` for the `db` project.
 
 - [ ] **Step 1:** Write the failing tests in `tests/db/rls.test.ts`:
@@ -285,7 +286,7 @@ README.md                            dev setup + launch runbook
 ### Task 10: Admin authentication
 
 **Files:**
-- Create: `middleware.ts` (session refresh for `/admin/:path*`), `src/lib/supabase/{server,browser}.ts`, `src/lib/admin/require-admin.ts`, `src/app/admin/login/page.tsx`, `src/app/admin/(protected)/layout.tsx`, `src/app/admin/(protected)/page.tsx` (dashboard), `scripts/create-admin.ts`, `tests/e2e/admin-auth.spec.ts`
+- Create: `src/middleware.ts` (session refresh for `/admin/:path*`), `src/lib/supabase/{server,browser}.ts`, `src/lib/admin/require-admin.ts`, `src/app/admin/login/page.tsx`, `src/app/admin/(protected)/layout.tsx`, `src/app/admin/(protected)/page.tsx` (dashboard), `scripts/create-admin.ts`, `tests/e2e/admin-auth.spec.ts`
 
 **Interfaces:**
 - `requireAdmin(): Promise<{userId: string; supabase: SupabaseClient}>`. It redirects to `/admin/login` with no session. For a non-admin session it signs out and redirects to `/admin/login?error=not-admin`.
