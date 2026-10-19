@@ -72,7 +72,7 @@ You need: **Node.js 22 or newer** (22.6+ is required because `create-admin` and 
    | `IP_HASH_SALT` | any text, for example `local` |
    | `ALLOW_DEV_FALLBACKS` | `true` (local only) |
 
-   Leave the Turnstile, Resend, `MAIL_FROM` and `NEXT_PUBLIC_SITE_URL` lines empty. With `ALLOW_DEV_FALLBACKS=true` the captcha passes and emails are printed to the terminal instead of sent. Without that flag a missing Turnstile or Resend key makes `/api/quote` fail with a 500.
+   Leave the Turnstile, Resend and `MAIL_FROM` lines empty. `NEXT_PUBLIC_SITE_URL` can stay empty for `npm run dev`, but a local `npm run build` needs `NEXT_PUBLIC_SITE_URL=http://localhost:3000` in `.env.local` (production builds refuse to run without it). With `ALLOW_DEV_FALLBACKS=true` the captcha passes and emails are printed to the terminal instead of sent. Without that flag a missing Turnstile or Resend key makes `/api/quote` fail with a 500.
 
 3. Run the site:
 
@@ -94,7 +94,7 @@ Other scripts: `npm run build` / `npm start` (production build), `npm run lint`,
 
 Things to know:
 
-- `npm run test:e2e` leaves a file called `.env.production.local` behind (local keys, `NEXT_PUBLIC_SITE_URL=http://localhost:3100`, `ALLOW_DEV_FALLBACKS=true`). **Delete it before running a real production build** (`npm run build`) on your machine. It is git-ignored.
+- `npm run test:e2e` leaves a file called `.env.production.local` behind (local keys, `NEXT_PUBLIC_SITE_URL=http://localhost:3100`, `ALLOW_DEV_FALLBACKS=true`). **Delete it before running a real production build** (`npm run build`) on your machine, and put `NEXT_PUBLIC_SITE_URL=http://localhost:3000` in `.env.local` for that build. It is git-ignored.
 - Never put `ADMIN_PASSWORD` or `ALLOW_DEV_FALLBACKS` in Vercel's environment variables. `.env.example` lists every variable the site reads, with a comment for each.
 
 ---
@@ -133,7 +133,7 @@ Do these in order. Steps marked **[browser]** are clicks on a website; steps mar
 
 Two plan notes: free Supabase projects are paused after a period of no activity (see [If something goes wrong](#if-something-goes-wrong)), and Vercel's free "Hobby" plan is meant for personal, non-commercial use. For a business website check Vercel's current terms and consider a paid plan before going live.
 
-Make sure the website code has been merged into the repository's main branch (`main`) on GitHub before step 8: Vercel publishes the repository's production branch as the live site. (If it is on another branch, choose that branch under **Settings > Git > Production Branch** after importing.)
+**The website code must be on the `main` branch on GitHub before you start step 3** (that is, after the pull request has been merged): step 3 downloads the code from there to run the database commands, and step 8 makes Vercel publish it. Vercel publishes the repository's production branch as the live site; if that is not `main`, choose it under **Settings > Git > Production Branch** after importing.
 
 ### 1. Create the Supabase project [browser]
 
@@ -153,7 +153,7 @@ Only the admin you create in step 9 should ever be able to sign in.
 
 ### 3. Create the database tables [terminal]
 
-This applies everything in `supabase/migrations/` (tables, security rules, storage buckets for images, datasheets and quote attachments, the spec-table function, upload limits).
+Run this from the `main` branch (the pull request must be merged). It applies everything in `supabase/migrations/` (tables, security rules, storage buckets for images, datasheets and quote attachments, the spec-table function, upload limits).
 
 ```bash
 git clone https://github.com/akshay-22502/vinayaka-marketing.git
@@ -161,26 +161,26 @@ cd vinayaka-marketing
 npm install
 npx supabase login                                # opens a browser to sign in to Supabase
 npx supabase link --project-ref <reference>       # the reference from step 1; may ask for the database password
-npx supabase db push --dry-run                    # optional: lists the migrations it will apply
-npx supabase db push                              # answer Y; applies all migrations
+npx supabase db push --dry-run                    # optional: lists the migrations it will apply (may ask for the password)
+npx supabase db push                              # may ask for the database password; answer Y to apply all migrations
 ```
 
 You should see the five migrations (`20261019000001_schema` up to `20261019000005_public_media_limits`) applied without errors.
 
 ### 4. Load the starter content, once [terminal]
 
-The seed uses a temporary helper that lives for one database session, so it must run over a **direct connection**, not through the transaction pooler.
+The seed uses a temporary helper that lives for one database session, so it must run over a **direct connection**, not through the Transaction pooler.
 
-1. In the Supabase dashboard click **Connect** (top of the project page) and choose the **Direct connection** string (a `postgresql://postgres:[YOUR-PASSWORD]@db.<reference>.supabase.co:5432/postgres` address). Replace `[YOUR-PASSWORD]` with the database password from step 1. If your password contains special characters, you may need to URL-encode them.
-   - If the connection fails with a message about the network being unreachable (some home and office networks have no IPv6), use the **Session pooler** string from the same screen instead. It must be the session mode (port 5432), **not** the transaction mode (port 6543).
-2. Run the seed:
+1. In the Supabase dashboard click **Connect** (top of the project page) and open the **Direct connection** details. You need the host (it looks like `db.<reference>.supabase.co`), the port (`5432`) and the user (`postgres`). The password is the database password from step 1; you type it when `psql` asks, so it never appears in a command.
+   - If the connection fails with a message that the network is unreachable (some home and office networks have no IPv6), use the **Session pooler** details from the same screen instead: take the host, port and **user** it shows (the user looks like `postgres.<reference>`). It must be the **Session pooler (port 5432)**, not the Transaction pooler (port 6543).
+2. Run the seed (replace `<reference>`; for the Session pooler use its host, port and user in `-h`, `-p` and `-U`):
 
    ```bash
-   DIRECT_URL='postgresql://postgres:<password>@db.<reference>.supabase.co:5432/postgres'
-   psql "$DIRECT_URL" -v ON_ERROR_STOP=1 -f supabase/seed.sql
+   psql -h db.<reference>.supabase.co -p 5432 -U postgres -d postgres -1 -v ON_ERROR_STOP=1 -f supabase/seed.sql
    ```
 
-3. **Run it only once, and always with `-v ON_ERROR_STOP=1`.** On a database that already has the starter content the seed stops at its first insert (duplicate category) and changes nothing. Without `ON_ERROR_STOP`, psql would carry on past that error and add the "confirm against the datasheet" reminder line to every product a second time. Never run it after you have started editing content in the admin.
+   `psql` asks for the password (nothing appears while you type it). Press Enter.
+3. **Run it once.** `-1` runs the whole file as a single transaction, so it either loads everything or nothing: if it stops with an error, the database is left exactly as it was and you can run the same command again once the cause is fixed. `-v ON_ERROR_STOP=1` makes it stop at the first error. On a database that already holds the starter content it fails at its first insert (duplicate category) and changes nothing, so it cannot overwrite what you have edited. Keep both options in the command.
 4. Check in the dashboard under **Table Editor** that `categories` has 4 rows and `products` has 7.
 
 ### 5. Copy the Supabase keys [browser]
@@ -191,7 +191,7 @@ Open **Project Settings > API** (on newer dashboards the keys are on a separate 
 - The **anon** key (public) is `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
 - The **service_role** key (secret, click to reveal) is `SUPABASE_SERVICE_ROLE_KEY`. It bypasses all security rules: never put it in code, chat or email.
 
-The site was built and tested with the long `eyJ...` style keys (the "legacy" anon and service_role keys). Supabase's newer `sb_publishable_...` / `sb_secret_...` keys are meant to be drop-in replacements but were not tested here.
+The site was built and tested with the long `eyJ...` style keys (the "legacy" anon and service_role keys). If your dashboard only offers Supabase's newer `sb_publishable_...` and `sb_secret_...` keys, use them in the same two variables (publishable for `NEXT_PUBLIC_SUPABASE_ANON_KEY`, secret for `SUPABASE_SERVICE_ROLE_KEY`). They were not tested with this site, so after the first deploy do the admin sign-in and a test quote in step 10 (step 9 uses the secret key as well). If either fails, tell the developer.
 
 ### 6. Create the Turnstile captcha [browser]
 
@@ -215,7 +215,7 @@ Emails are sent from `TerraTechBharat <quotes@terratechbharat.com>`. That addres
 1. Go to <https://vercel.com/new> and sign in (use **Continue with GitHub**).
 2. Under **Import Git Repository** find `akshay-22502/vinayaka-marketing` and click **Import**. If it is not listed, click **Adjust GitHub App Permissions** and give Vercel access to that repository.
 3. On the **Configure Project** screen leave **Framework Preset** as **Next.js** and **Root Directory** as `./`. Leave the build settings alone.
-4. Open **Environment Variables** and add the variables in the table below. For each: type the name, paste the value, keep the **Production** and **Preview** boxes ticked (except where the table says otherwise), and click **Add**. Mark the secrets as **Sensitive** if Vercel offers the option.
+4. Open **Environment Variables** and add the variables in the table below. For each: type the name, paste the value, set it for **Production** and **Preview** (you do not need Development), and click **Add**. Mark the secrets as **Sensitive** if Vercel offers the option.
 5. Click **Deploy**. When it finishes, Vercel shows the project's address (`https://<project>.vercel.app`).
 
 | Variable | Where to get it | Environments | Visibility |
@@ -223,7 +223,7 @@ Emails are sent from `TerraTechBharat <quotes@terratechbharat.com>`. That addres
 | `NEXT_PUBLIC_SUPABASE_URL` | Step 5: Project URL | Production + Preview | Public (sent to browsers) |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Step 5: anon key | Production + Preview | Public (protected by security rules) |
 | `SUPABASE_SERVICE_ROLE_KEY` | Step 5: service_role key | Production + Preview | **Secret**, server only |
-| `NEXT_PUBLIC_SITE_URL` | You choose the main address: `https://www.terratechbharat.com` (no trailing slash). It must be the address you make primary in step 12 | **Production only** (required: the production build fails without it). Leave it unset for Preview; previews then use their own address and are hidden from search engines | Public |
+| `NEXT_PUBLIC_SITE_URL` | You choose the main address: `https://www.terratechbharat.com`. It must start with `https://`, have no path, and be the address you make primary in step 12. Required: the production build fails without it | Production + Preview (harmless on Preview: preview sites are kept out of search engines) | Public |
 | `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | Step 6: Site Key | Production + Preview | Public |
 | `TURNSTILE_SECRET_KEY` | Step 6: Secret Key | Production + Preview | **Secret**, server only |
 | `RESEND_API_KEY` | Step 7: API key | Production + Preview | **Secret**, server only |
@@ -238,20 +238,26 @@ Preview deployments (branch builds) talk to the same live database and send real
 
 ### 9. Create the admin account [terminal]
 
-From the same `vinayaka-marketing` folder, with the **live** project's values for this one command:
+Run this from the same `vinayaka-marketing` folder, with the **live** project's values. The `service_role` key is a secret, so you enter it at a hidden prompt instead of typing it into a command (a typed command is saved in your shell history):
 
 ```bash
-NEXT_PUBLIC_SUPABASE_URL='https://<reference>.supabase.co' \
-SUPABASE_SERVICE_ROLE_KEY='<the service_role key from step 5>' \
-npm run -s create-admin -- owner@example.com
+printf 'service_role key: '; read -rs SUPABASE_SERVICE_ROLE_KEY; echo; export SUPABASE_SERVICE_ROLE_KEY
+```
+
+Paste the key from step 5 (nothing appears) and press Enter. Then:
+
+```bash
+NEXT_PUBLIC_SUPABASE_URL='https://<reference>.supabase.co' npm run -s create-admin -- owner@example.com
+unset SUPABASE_SERVICE_ROLE_KEY
 ```
 
 - Replace `owner@example.com` with the owner's email address (this is the login).
-- It asks for a password twice (hidden, at least 10 characters). To skip the question, put `ADMIN_PASSWORD='...'` in front of the command for that one run.
-- Always type `npm run -s create-admin -- <email>` exactly like this: the `-s` keeps your password out of the terminal output, and the `--` is required.
+- It asks for a password twice (hidden, at least 10 characters). **This is the recommended way**: generate the password in your password manager and paste it at the prompt.
+- Avoid putting the password in front of the command (`ADMIN_PASSWORD='...' npm run ...`): what you type is saved in your shell history. If you cannot use the prompt, read it the same hidden way (`read -rs ADMIN_PASSWORD; export ADMIN_PASSWORD`) and `unset ADMIN_PASSWORD` afterwards.
+- Keep `-s` and `--` in the command as shown. `-s` stops npm from echoing the command line, which matters if a password is ever given as an argument (not recommended). `--` is needed so that flags such as `--force` reach the script instead of npm.
 - It prints "Using the Supabase project at ..." before doing anything. If it says "local Supabase stack" instead, the two variables were not set, so stop and check.
 - It makes one admin. A second, different address is refused unless you add `--force`. Running the command again for the same email resets that password (that is also how to recover a forgotten password).
-- Do not set `ADMIN_PASSWORD` on Vercel, and close the terminal afterwards: the key you typed stays in your shell history.
+- Do not set `ADMIN_PASSWORD` on Vercel. The `service_role` key belongs only in Vercel's environment variables and, for this one command, in your terminal.
 
 ### 10. First sign-in and a test quote [browser]
 
@@ -264,7 +270,13 @@ npm run -s create-admin -- owner@example.com
    - Read the **Tagline**, **Home page title**, **Home page text** and **About page text** and correct anything that is not right.
    - Click **Save**.
 5. Send a test quote from `https://<project>.vercel.app/quote` for India, then another for the UAE (use your own email as the buyer). Within a minute each should reach the matching recipient, and you should get a confirmation email. Both requests should appear under **Quotes** in the admin without an "Email not sent" tag. Also try once with a small PDF attached. You can send 5 requests per hour from one address.
-6. Check the captcha and the emails behaved: this is the one part that could not be tested with real keys during development. If a quote fails, see [If something goes wrong](#if-something-goes-wrong).
+6. Check the captcha with the real keys (this is the one part that could not be tested during development):
+   - the Turnstile box ("Verifying..." then "Success") shows on the quote form at `/quote`;
+   - a submit succeeds and the request appears under **Quotes**;
+   - open the form, leave it untouched for about 5 minutes, then submit: it should still go through, or the box should refresh itself or ask you to try again, rather than leave the form stuck;
+   - repeat the first two checks on a phone.
+
+   If anything fails, see [If something goes wrong](#if-something-goes-wrong).
 7. In the Quotes list set the two test requests to **Closed**.
 
 ### 11. Check and publish the content [browser]
@@ -324,8 +336,10 @@ From then on:
 
 - **The site shows an error page after a quiet period.** A free Supabase project is paused when it has had no activity for a while. Open the Supabase dashboard and click **Restore project**; the site comes back in a few minutes. A paid plan avoids this.
 - **A quote shows "Email not sent".** Check in this order: (1) Admin > Settings has an email for that country; (2) Resend > Domains shows `terratechbharat.com` as **Verified**; (3) `RESEND_API_KEY` is correct in Vercel (then **Redeploy**); (4) Vercel > project > **Logs** for the error. The request itself is always saved.
+- **The seed (step 4) failed or stopped halfway.** Because it runs as one transaction (`-1`), a failure leaves the database as it was: read the error, fix the cause and run the same command again. Typical errors: `password authentication failed` (wrong database password), `Network is unreachable` (use the Session pooler details, step 4), `psql: command not found` (install the PostgreSQL client tools), and `duplicate key value violates unique constraint "categories_slug_key"` (the starter content is already loaded: do not run it again). If you ever ran it without `-1` and it stopped halfway, ask a developer to clear the half-loaded content before you have entered anything of your own (Supabase **SQL Editor**: `truncate public.categories, public.applications cascade;`) and then run the command again.
 - **The quote form says the captcha failed or never loads.** The Turnstile hostnames must include the address you are visiting, and both Turnstile keys must be set in Vercel (then **Redeploy**).
-- **A Vercel build fails with "Missing required environment variable NEXT_PUBLIC_SITE_URL".** Add it for Production (step 8), then redeploy.
+- **A Vercel build fails with "Missing required environment variable NEXT_PUBLIC_SITE_URL".** Add it (step 8), then redeploy.
+- **A Vercel build fails with "NEXT_PUBLIC_SITE_URL must be a full URL starting with http:// or https://".** The value has no scheme, for example `www.terratechbharat.com`. Change it to `https://www.terratechbharat.com` (step 8), then redeploy.
 - **You changed an environment variable and nothing changed.** Redeploy (step 8, last paragraph).
 - **You cannot sign in to the admin although the password is right.** Supabase limits sign-in attempts, and that limit is shared by all visitors Vercel serves; wait a few minutes, or raise the limit in the Supabase dashboard under **Authentication > Rate Limits**. If you forgot the password, run step 9 again for the same email to set a new one.
 - **A visitor sees "Too many requests" on the quote form.** The limit is 5 quote requests per hour from one address.

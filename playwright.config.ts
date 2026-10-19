@@ -3,8 +3,9 @@ import { defineConfig, devices } from "@playwright/test";
 
 // E2E runs against a production build (`npm run test:e2e` first runs the
 // `pretest:e2e` script: db:reset, scripts/e2e-prepare.ts, next build) so that
-// caching and revalidation are real. Chromium comes preinstalled
-// (PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers); do not run `playwright install`.
+// caching and revalidation are real. In the CI/sandbox image Chromium comes preinstalled
+// (PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers), so do not run `playwright install` there.
+// On a fresh machine, run `npx playwright install chromium` once.
 
 // scripts/e2e-prepare.ts writes the local Supabase keys and E2E flags here.
 // Loading it makes them available to test code (e.g. the service-role key) and
