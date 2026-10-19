@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { toSpecGrid } from "@/lib/content/spec-grid";
+import { toRpcPayload, toSpecGrid } from "@/lib/content/spec-grid";
+import type { SpecGrid } from "@/lib/content/types";
 
 const model = (id: string, code: string, sort_order: number) => ({ id, code, sort_order });
 const property = (
@@ -104,5 +105,100 @@ describe("toSpecGrid", () => {
   it("gives rows with no models an empty values list", () => {
     const grid = toSpecGrid([], [property("p1", "Strength", 0)], []);
     expect(grid.rows).toEqual([{ name: "Strength", unit: null, testMethod: null, values: [] }]);
+  });
+});
+
+/**
+ * What the database ends up holding after save_spec_table(payload): the three tables, with the
+ * RPC's behaviour (array order becomes sort_order, a missing unit or value is stored as "").
+ */
+function storeLikeTheRpc(payload: ReturnType<typeof toRpcPayload>) {
+  const models = payload.models.map((code, index) => model(`m${index}`, code, index));
+  const properties = payload.rows.map((row, index) => property(`p${index}`, row.name, index, row.unit, row.test_method));
+  const values = payload.rows.flatMap((row, p) => row.values.map((v, m) => value(`p${p}`, `m${m}`, v)));
+  return { models, properties, values };
+}
+
+describe("toRpcPayload", () => {
+  const grid: SpecGrid = {
+    models: ["BX1515", "BX2020", "BX3030"],
+    rows: [
+      { name: "Tensile strength, MD / XMD", unit: "kN/m", testMethod: "ASTM D6637", values: ["15 / 15", null, "30 / 30"] },
+      { name: "Colour", unit: null, testMethod: null, values: ["Black", "Black", null] },
+    ],
+  };
+
+  it("has the shape save_spec_table expects: snake_case keys, text everywhere, one value per model", () => {
+    expect(toRpcPayload(grid)).toEqual({
+      models: ["BX1515", "BX2020", "BX3030"],
+      rows: [
+        { name: "Tensile strength, MD / XMD", unit: "kN/m", test_method: "ASTM D6637", values: ["15 / 15", "", "30 / 30"] },
+        { name: "Colour", unit: "", test_method: "", values: ["Black", "Black", ""] },
+      ],
+    });
+  });
+
+  it("round-trips: reading back what was saved gives the grid that was sent", () => {
+    const stored = storeLikeTheRpc(toRpcPayload(grid));
+    expect(toSpecGrid(stored.models, stored.properties, stored.values)).toEqual(grid);
+  });
+
+  it("round-trips an empty grid, a grid with no models and a grid with no rows", () => {
+    for (const empty of [
+      { models: [], rows: [] },
+      { models: [], rows: [{ name: "Strength", unit: null, testMethod: null, values: [] }] },
+      { models: ["A", "B"], rows: [] },
+    ] satisfies SpecGrid[]) {
+      const stored = storeLikeTheRpc(toRpcPayload(empty));
+      expect(toSpecGrid(stored.models, stored.properties, stored.values)).toEqual(empty);
+    }
+  });
+
+  it("round-trips the seed-style table of the PP Biaxial Geogrid", () => {
+    const seedLike: SpecGrid = {
+      models: ["BX1515", "BX2020", "BX3030", "BX4040"],
+      rows: [
+        { name: "Junction efficiency", unit: "%", testMethod: "GRI-GG2", values: ["≥ 93", "≥ 93", "≥ 93", "≥ 93"] },
+        { name: "Aperture size, MD x XMD", unit: "mm", testMethod: null, values: ["40 x 40", "40 x 40", "40 x 40", "40 x 40"] },
+      ],
+    };
+    const stored = storeLikeTheRpc(toRpcPayload(seedLike));
+    expect(toSpecGrid(stored.models, stored.properties, stored.values)).toEqual(seedLike);
+  });
+
+  it("sends null as an empty string (never the word null, never undefined)", () => {
+    const payload = toRpcPayload({ models: ["A"], rows: [{ name: "X", unit: null, testMethod: null, values: [null] }] });
+    expect(payload.rows[0]).toEqual({ name: "X", unit: "", test_method: "", values: [""] });
+    expect(JSON.stringify(payload)).not.toContain("null");
+  });
+
+  it("gives every row exactly one value per model: short rows are padded, extra values dropped", () => {
+    const payload = toRpcPayload({
+      models: ["A", "B", "C"],
+      rows: [
+        { name: "Short", unit: null, testMethod: null, values: ["1"] },
+        { name: "Long", unit: null, testMethod: null, values: ["1", "2", "3", "4", "5"] },
+      ],
+    });
+    expect(payload.rows[0].values).toEqual(["1", "", ""]);
+    expect(payload.rows[1].values).toEqual(["1", "2", "3"]);
+  });
+
+  it("keeps the order of models and rows (array order becomes sort_order)", () => {
+    const payload = toRpcPayload({
+      models: ["Z", "A"],
+      rows: [
+        { name: "Second alphabetically", unit: null, testMethod: null, values: ["z", "a"] },
+        { name: "First alphabetically", unit: null, testMethod: null, values: ["z", "a"] },
+      ],
+    });
+    expect(payload.models).toEqual(["Z", "A"]);
+    expect(payload.rows.map((row) => row.name)).toEqual(["Second alphabetically", "First alphabetically"]);
+  });
+
+  it("does not change the grid it is given", () => {
+    const copy = structuredClone(grid);
+    toRpcPayload(grid);
+    expect(grid).toEqual(copy);
   });
 });

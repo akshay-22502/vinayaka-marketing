@@ -46,3 +46,28 @@ export function toSpecGrid(
     })),
   };
 }
+
+/** The argument of the `save_spec_table` RPC: text everywhere (the table stores "no value" as ""), one value per model. */
+export type SpecRpcPayload = {
+  models: string[];
+  rows: { name: string; unit: string; test_method: string; values: string[] }[];
+};
+
+/**
+ * Turns a grid into the payload `save_spec_table(p_product_id, p_grid)` expects. It is the
+ * inverse of `toSpecGrid`: a null unit, test method or value becomes "", and reading the saved
+ * rows back gives the same grid. Array order becomes sort_order in the database. Every row gets
+ * exactly one value per model (short rows are padded with "", extra values dropped), because the
+ * RPC refuses a row whose values do not line up with the models.
+ */
+export function toRpcPayload(grid: SpecGrid): SpecRpcPayload {
+  return {
+    models: [...grid.models],
+    rows: grid.rows.map((row) => ({
+      name: row.name,
+      unit: row.unit ?? "",
+      test_method: row.testMethod ?? "",
+      values: grid.models.map((_, column) => row.values[column] ?? ""),
+    })),
+  };
+}

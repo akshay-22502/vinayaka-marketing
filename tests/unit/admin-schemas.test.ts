@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  CATEGORY_GONE_MESSAGE,
   CATEGORY_HAS_PRODUCTS_MESSAGE,
   FORM_ERROR,
+  NOT_FOUND_MESSAGE,
   SLUG_TAKEN_MESSAGE,
   fromPgError,
 } from "@/lib/admin/action-result";
@@ -13,13 +15,20 @@ import {
   certificationSchema,
   parseForm,
   parseInput,
+  productSchema,
   projectSchema,
+  PUBLISH_CONFIRM_FIELD,
+  PUBLISH_NOTE_MESSAGE,
+  hasDatasheetReminder,
 } from "@/lib/admin/schemas";
 
 // The admin forms post plain strings; these are the validation rules behind them.
 
 const PRODUCT_ID = "0b5f2c1e-8d7a-4c3b-9e21-5a6f7d8c9b10";
 const OTHER_PRODUCT_ID = "7c1d9a44-2f0e-4b8a-a3d5-1e9c6b7f8a20";
+const CATEGORY_ID = "3e4f5a6b-7c8d-4e9f-a0b1-c2d3e4f5a6b7";
+const APPLICATION_ID = "5a6b7c8d-9e0f-4a1b-b2c3-d4e5f6a7b8c9";
+const OTHER_APPLICATION_ID = "6b7c8d9e-0f1a-4b2c-83d4-e5f6a7b8c9d0";
 
 function ok<T>(result: { ok: true; data: T } | { ok: false; errors: Record<string, string> }): T {
   if (!result.ok) throw new Error(`Expected valid input, got errors: ${JSON.stringify(result.errors)}`);
@@ -97,6 +106,38 @@ describe("fromPgError", () => {
   });
 });
 
+describe("fromPgError: a product whose category was deleted in the meantime", () => {
+  it("puts the message on the category field, and does not say the category still has products", () => {
+    const result = fromPgError({
+      code: "23503",
+      message: 'insert or update on table "products" violates foreign key constraint "products_category_id_fkey"',
+      details: 'Key (category_id)=(abc) is not present in table "categories".',
+    });
+    expect(result).toEqual({ ok: false, errors: { category_id: CATEGORY_GONE_MESSAGE } });
+  });
+});
+
+describe("fromPgError: spec table (RPC) errors", () => {
+  it("maps 'product not found' (P0002) to the not-found message", () => {
+    expect(fromPgError({ code: "P0002", message: "Product 123 not found" })).toEqual({
+      ok: false,
+      errors: { [FORM_ERROR]: NOT_FOUND_MESSAGE },
+    });
+  });
+
+  it("maps a refusal for a non-admin (42501) to a permission message without database text", () => {
+    const result = fromPgError({ code: "42501", message: "Only admins can save a spec table" });
+    expect(result.errors[FORM_ERROR]).toMatch(/permission/i);
+    expect(JSON.stringify(result)).not.toContain("Only admins");
+  });
+
+  it("maps invalid input (22023) to a message about the values, without database text", () => {
+    const result = fromPgError({ code: "22023", message: 'Row "Strength" has 3 values but there are 4 models' });
+    expect(result.errors[FORM_ERROR]).toMatch(/not valid/i);
+    expect(JSON.stringify(result)).not.toContain("Strength");
+  });
+});
+
 describe("slug rules", () => {
   const base = { name: "Geo Textile", slug: "", intro: "", image_path: "", sort_order: "", published: undefined };
 
@@ -137,13 +178,39 @@ describe("slug rules", () => {
     }
   });
 
-  it("caps the slug at 100 characters, typed or derived", () => {
+  it("rejects a typed slug over 100 characters", () => {
     const longSlug = "a".repeat(101);
     expect(errorsOf(parseInput(categorySchema, { name: "Geo", slug: longSlug })).slug).toBe(SLUG_INVALID_MESSAGE);
     expect(ok(parseInput(categorySchema, { name: "Geo", slug: "a".repeat(100) })).slug).toHaveLength(100);
+  });
 
-    const longName = "word ".repeat(40); // derives a 199-character slug
-    expect(errorsOf(parseInput(categorySchema, { name: longName.trim(), slug: "" })).slug).toBe(SLUG_INVALID_MESSAGE);
+  it("truncates a slug derived from a long name at a hyphen, never ending in a hyphen (Task 11 review)", () => {
+    const longName = "word ".repeat(24).trim(); // 119 characters (the name limit is 120): would derive a 119-character slug
+    const slug = ok(parseInput(categorySchema, { name: longName, slug: "" })).slug;
+    expect(slug.length).toBeLessThanOrEqual(100);
+    expect(slug).toMatch(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
+    expect(longName.replace(/ /g, "-")).toContain(slug);
+    // 'word-word-...': 20 words and 19 hyphens are 99 characters; the 21st word would not fit.
+    expect(slug).toBe(Array(20).fill("word").join("-"));
+  });
+
+  it("truncates derived slugs for applications, projects and products as well", () => {
+    const long = `${"Polypropylene Geosynthetic Reinforcement Grid ".repeat(2)}Polypropylene Geosynthetic`; // 118 characters
+    const slugs = [
+      ok(parseInput(applicationSchema, { name: long })).slug,
+      ok(parseInput(projectSchema, { title: long, country: "IN" })).slug,
+      ok(parseInput(productSchema, { name: long, category_id: CATEGORY_ID })).slug,
+    ];
+    for (const slug of slugs) {
+      expect(slug.length).toBeLessThanOrEqual(100);
+      expect(slug.endsWith("-")).toBe(false);
+      expect(slug).toMatch(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
+      expect(slug.startsWith("polypropylene-geosynthetic-reinforcement-grid-")).toBe(true);
+    }
+  });
+
+  it("cuts one very long unbroken word at 100 characters", () => {
+    expect(ok(parseInput(categorySchema, { name: "a".repeat(120), slug: "" })).slug).toBe("a".repeat(100));
   });
 
   it("reports a bad slug together with other field errors", () => {
@@ -362,5 +429,187 @@ describe("parseForm", () => {
     const form = new FormData();
     form.set("name", new File(["x"], "x.txt"));
     expect(errorsOf(parseForm(categorySchema, form)).name).toBeTruthy();
+  });
+});
+
+describe("productSchema", () => {
+  const base = { name: "PP Biaxial Geogrid", category_id: CATEGORY_ID };
+
+  it("produces a database row plus the linked application ids and the publish confirmation", () => {
+    expect(
+      ok(
+        parseInput(productSchema, {
+          ...base,
+          slug: "",
+          summary: " Equal strength both ways. ",
+          overview: "## Overview\r\nText",
+          features: "Strong\r\n  UV stable  \n\n",
+          images: ["products/a-1.png", "products/b-2.png"],
+          datasheet_path: "products/c-3.pdf",
+          application_ids: [APPLICATION_ID, OTHER_APPLICATION_ID],
+          sort_order: "3",
+          published: "on",
+        }),
+      ),
+    ).toEqual({
+      name: "PP Biaxial Geogrid",
+      slug: "pp-biaxial-geogrid",
+      category_id: CATEGORY_ID,
+      summary: "Equal strength both ways.",
+      overview: "## Overview\nText",
+      features: ["Strong", "UV stable"],
+      images: ["products/a-1.png", "products/b-2.png"],
+      datasheet_path: "products/c-3.pdf",
+      application_ids: [APPLICATION_ID, OTHER_APPLICATION_ID],
+      confirm_unverified: false,
+      sort_order: 3,
+      published: true,
+    });
+  });
+
+  it("has sensible defaults: draft, no features, images, datasheet or applications", () => {
+    expect(ok(parseInput(productSchema, base))).toEqual({
+      name: "PP Biaxial Geogrid",
+      slug: "pp-biaxial-geogrid",
+      category_id: CATEGORY_ID,
+      summary: "",
+      overview: "",
+      features: [],
+      images: [],
+      datasheet_path: null,
+      application_ids: [],
+      confirm_unverified: false,
+      sort_order: 0,
+      published: false,
+    });
+  });
+
+  it("requires a name and a category", () => {
+    expect(errorsOf(parseInput(productSchema, { category_id: CATEGORY_ID })).name).toBe("Enter a name");
+    expect(errorsOf(parseInput(productSchema, { name: "  ", category_id: CATEGORY_ID })).name).toBe("Enter a name");
+    for (const category_id of [undefined, "", "  ", "geogrid", "1; drop table products"]) {
+      expect(errorsOf(parseInput(productSchema, { name: "X", category_id })).category_id, String(category_id)).toBe(
+        "Choose a category",
+      );
+    }
+  });
+
+  it("keeps a typed slug and checks it like every other slug", () => {
+    expect(ok(parseInput(productSchema, { ...base, slug: " pp-grid " })).slug).toBe("pp-grid");
+    expect(errorsOf(parseInput(productSchema, { ...base, slug: "PP Grid" })).slug).toBe(SLUG_INVALID_MESSAGE);
+    expect(errorsOf(parseInput(productSchema, { name: "सड़कें", category_id: CATEGORY_ID })).slug).toBe(SLUG_EMPTY_MESSAGE);
+  });
+
+  it("reads features one per line: trimmed, blank lines dropped, any line-break style", () => {
+    const features = (text: string) => ok(parseInput(productSchema, { ...base, features: text })).features;
+    expect(features("a\nb")).toEqual(["a", "b"]);
+    expect(features("a\r\n\r\n  b  \r\n")).toEqual(["a", "b"]);
+    expect(features("")).toEqual([]);
+    expect(features("   \n  ")).toEqual([]);
+  });
+
+  it("limits the number of features and their length", () => {
+    const many = Array.from({ length: 31 }, (_, i) => `Feature ${i}`).join("\n");
+    expect(errorsOf(parseInput(productSchema, { ...base, features: many })).features).toMatch(/30/);
+    expect(errorsOf(parseInput(productSchema, { ...base, features: "f".repeat(301) })).features).toMatch(/300/);
+    expect(ok(parseInput(productSchema, { ...base, features: "f".repeat(300) })).features).toHaveLength(1);
+  });
+
+  it("limits name, summary and overview", () => {
+    expect(errorsOf(parseInput(productSchema, { name: "n".repeat(201), slug: "n", category_id: CATEGORY_ID })).name).toMatch(/200/);
+    expect(errorsOf(parseInput(productSchema, { ...base, summary: "s".repeat(501) })).summary).toMatch(/500/);
+    expect(errorsOf(parseInput(productSchema, { ...base, overview: "o".repeat(20001) })).overview).toMatch(/20000/);
+  });
+
+  it("accepts images as one string or several, drops blank rows, and refuses unsafe paths", () => {
+    expect(ok(parseInput(productSchema, { ...base, images: "products/a-1.png" })).images).toEqual(["products/a-1.png"]);
+    expect(ok(parseInput(productSchema, { ...base, images: ["", "products/a-1.png", " "] })).images).toEqual(["products/a-1.png"]);
+    expect(errorsOf(parseInput(productSchema, { ...base, images: ["../x.png"] })).images).toBeTruthy();
+    const many = Array.from({ length: 21 }, (_, i) => `products/${i}-x.png`);
+    expect(errorsOf(parseInput(productSchema, { ...base, images: many })).images).toMatch(/20/);
+    // The message is shared with projects, so it must not talk about projects.
+    expect(errorsOf(parseInput(productSchema, { ...base, images: many })).images).not.toMatch(/project/i);
+  });
+
+  it("refuses an unsafe datasheet path; blank means none", () => {
+    expect(ok(parseInput(productSchema, { ...base, datasheet_path: "" })).datasheet_path).toBeNull();
+    expect(errorsOf(parseInput(productSchema, { ...base, datasheet_path: "/etc/passwd" })).datasheet_path).toBeTruthy();
+  });
+
+  it("accepts one application id or several, removes duplicates, and refuses anything that is not an id", () => {
+    const ids = (application_ids: unknown) => ok(parseInput(productSchema, { ...base, application_ids })).application_ids;
+    expect(ids(APPLICATION_ID)).toEqual([APPLICATION_ID]);
+    expect(ids([APPLICATION_ID, APPLICATION_ID, OTHER_APPLICATION_ID])).toEqual([APPLICATION_ID, OTHER_APPLICATION_ID]);
+    expect(ids(undefined)).toEqual([]);
+    expect(errorsOf(parseInput(productSchema, { ...base, application_ids: ["roads"] })).application_ids).toBe(
+      "Choose applications from the list",
+    );
+  });
+
+  it("drops fields it does not know, so a hand-made request cannot set other columns", () => {
+    const row = ok(parseInput(productSchema, { ...base, id: OTHER_PRODUCT_ID, created_at: "2020-01-01", updated_at: "x" }));
+    expect(row).not.toHaveProperty("id");
+    expect(row).not.toHaveProperty("created_at");
+    expect(row).not.toHaveProperty("updated_at");
+  });
+
+  it("parses a posted form (repeated fields become lists)", () => {
+    const form = new FormData();
+    form.append("name", "PP Biaxial Geogrid");
+    form.append("category_id", CATEGORY_ID);
+    form.append("images", "products/a-1.png");
+    form.append("images", "products/b-2.png");
+    form.append("application_ids", APPLICATION_ID);
+    form.append("application_ids", OTHER_APPLICATION_ID);
+    form.append("features", "One\r\nTwo");
+    const data = ok(parseForm(productSchema, form));
+    expect(data.images).toEqual(["products/a-1.png", "products/b-2.png"]);
+    expect(data.application_ids).toEqual([APPLICATION_ID, OTHER_APPLICATION_ID]);
+    expect(data.features).toEqual(["One", "Two"]);
+  });
+});
+
+describe("the datasheet reminder in a published product's overview (Ruling R9)", () => {
+  const REMINDER = "_Typical values. Confirm against the manufacturer's datasheet before publishing._";
+  const overview = `Some text.\n\n${REMINDER}`;
+  const base = { name: "PP Biaxial Geogrid", category_id: CATEGORY_ID, overview };
+
+  it("recognises the seeded line, whatever the case, apostrophe or Markdown around it", () => {
+    expect(hasDatasheetReminder(overview)).toBe(true);
+    expect(hasDatasheetReminder("CONFIRM AGAINST THE MANUFACTURER'S DATASHEET BEFORE PUBLISHING")).toBe(true);
+    expect(hasDatasheetReminder("Confirm against the manufacturer\u2019s datasheet before publishing.")).toBe(true);
+    expect(hasDatasheetReminder("Confirm  against the   manufacturer's\ndatasheet before publishing")).toBe(true);
+    expect(hasDatasheetReminder("Typical values. Contact us to confirm.")).toBe(false);
+    expect(hasDatasheetReminder("")).toBe(false);
+  });
+
+  it("refuses to publish while the reminder is still there, with a message on the confirmation field", () => {
+    const errors = errorsOf(parseInput(productSchema, { ...base, published: "on" }));
+    expect(errors).toEqual({ [PUBLISH_CONFIRM_FIELD]: PUBLISH_NOTE_MESSAGE });
+    expect(PUBLISH_NOTE_MESSAGE).toMatch(/datasheet/i);
+    expect(PUBLISH_NOTE_MESSAGE).toMatch(/tick/i);
+  });
+
+  it("publishes once the admin confirms", () => {
+    const row = ok(parseInput(productSchema, { ...base, published: "on", confirm_unverified: "on" }));
+    expect(row.published).toBe(true);
+    expect(row.overview).toContain("Confirm against the manufacturer's datasheet before publishing");
+  });
+
+  it("publishes without a confirmation once the line is deleted from the overview", () => {
+    const row = ok(parseInput(productSchema, { ...base, overview: "Some text.", published: "on" }));
+    expect(row.published).toBe(true);
+  });
+
+  it("does not ask when the product stays a draft", () => {
+    expect(ok(parseInput(productSchema, base)).published).toBe(false);
+    expect(ok(parseInput(productSchema, { ...base, published: undefined })).published).toBe(false);
+  });
+
+  it("still reports the other errors alongside", () => {
+    const errors = errorsOf(parseInput(productSchema, { name: "", category_id: "", overview, published: "on" }));
+    expect(errors.name).toBe("Enter a name");
+    expect(errors.category_id).toBe("Choose a category");
+    expect(errors[PUBLISH_CONFIRM_FIELD]).toBe(PUBLISH_NOTE_MESSAGE);
   });
 });

@@ -542,9 +542,10 @@ describe("database guards", () => {
 });
 
 describe("storage buckets", () => {
-  const publicPath = `test/${run}/hello.txt`;
+  // public-media only takes png/jpeg/webp/pdf (see the 000005 migration), so the test files are PDFs.
+  const publicPath = `test/${run}/hello.pdf`;
   const privatePath = `${run}/attachment.txt`;
-  const body = new Blob(["hello"], { type: "text/plain" });
+  const body = new Blob(["hello"], { type: "application/pdf" });
   // quote-attachments only takes the types the quote API stores (see the 000004 migration).
   const attachmentBody = new Blob(["hello"], { type: "application/pdf" });
 
@@ -582,9 +583,9 @@ describe("storage buckets", () => {
   });
 
   it("lets only admins write to public-media", async () => {
-    const path = `test/${run}/by-admin.txt`;
-    expect((await anon.storage.from("public-media").upload(`test/${run}/by-anon.txt`, body)).error).not.toBeNull();
-    expect((await member.storage.from("public-media").upload(`test/${run}/by-member.txt`, body)).error).not.toBeNull();
+    const path = `test/${run}/by-admin.pdf`;
+    expect((await anon.storage.from("public-media").upload(`test/${run}/by-anon.pdf`, body)).error).not.toBeNull();
+    expect((await member.storage.from("public-media").upload(`test/${run}/by-member.pdf`, body)).error).not.toBeNull();
     const ok = await admin.storage.from("public-media").upload(path, body);
     expect(ok.error).toBeNull();
     uploaded.push({ bucket: "public-media", path });

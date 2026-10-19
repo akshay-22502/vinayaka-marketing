@@ -9,9 +9,16 @@ export type ActionFailure = Extract<ActionResult, { ok: false }>;
 /** The key under which a message that belongs to the whole form is returned. */
 export const FORM_ERROR = "form";
 
+/** The key of the "publish anyway" confirmation of a product (see productSchema). */
+export const PUBLISH_CONFIRM_FIELD = "publish_confirm";
+
 export const SLUG_TAKEN_MESSAGE = "This URL slug is already used";
 export const CATEGORY_HAS_PRODUCTS_MESSAGE = "This category still has products. Move or delete them first.";
 export const NOT_FOUND_MESSAGE = "This item no longer exists. It may have been deleted in another window.";
+export const CATEGORY_GONE_MESSAGE = "This category no longer exists. Choose another one.";
+const NOT_ALLOWED_MESSAGE = "You do not have permission to do that. Sign in again with an admin account.";
+const INVALID_VALUES_MESSAGE =
+  "Some values are not valid. Check the model codes, property names and values, then save again.";
 const VALUE_TAKEN_MESSAGE = "Another item already uses one of these values. Change it and try again.";
 const LINKED_MESSAGE = "A linked item no longer exists or is still in use. Reload the page and try again.";
 const SAVE_FAILED_MESSAGE = "Could not save. Please try again.";
@@ -39,7 +46,10 @@ function isSlugViolation(error: PgErrorLike): boolean {
  * Turns a Postgres/PostgREST error into form messages:
  *  - unique violation on a slug: "This URL slug is already used" on the slug field (never a 500);
  *  - deleting a category that still has products (`products.category_id` is ON DELETE RESTRICT):
- *    a friendly message for the form;
+ *    a friendly message for the form; saving a product into a category that was deleted in the
+ *    meantime: a message on the category field;
+ *  - the spec table RPC's own errors: product not found (P0002), not an admin (42501), rejected
+ *    input (22023);
  *  - anything else: a generic message. The database text is never shown to the admin.
  */
 export function fromPgError(error: unknown): ActionFailure {
@@ -52,8 +62,19 @@ export function fromPgError(error: unknown): ActionFailure {
 
   if (code === "23503") {
     const detail = `${text(pg.message)} ${text(pg.details)} ${text(pg.constraint)}`;
-    return failure({ [FORM_ERROR]: /products_category_id/.test(detail) ? CATEGORY_HAS_PRODUCTS_MESSAGE : LINKED_MESSAGE });
+    if (/products_category_id/.test(detail)) {
+      // Saving a product (insert or update) names a category that is gone; deleting a category names the products that block it.
+      return /insert or update on table "products"/.test(detail)
+        ? failure({ category_id: CATEGORY_GONE_MESSAGE })
+        : failure({ [FORM_ERROR]: CATEGORY_HAS_PRODUCTS_MESSAGE });
+    }
+    return failure({ [FORM_ERROR]: LINKED_MESSAGE });
   }
+
+  // Raised by save_spec_table().
+  if (code === "P0002") return failure({ [FORM_ERROR]: NOT_FOUND_MESSAGE });
+  if (code === "42501") return failure({ [FORM_ERROR]: NOT_ALLOWED_MESSAGE });
+  if (code === "22023") return failure({ [FORM_ERROR]: INVALID_VALUES_MESSAGE });
 
   return failure({ [FORM_ERROR]: SAVE_FAILED_MESSAGE });
 }

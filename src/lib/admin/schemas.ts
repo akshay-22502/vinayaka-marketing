@@ -1,6 +1,8 @@
 import { z } from "zod";
-import { slugify } from "@/lib/slug";
-import { FORM_ERROR } from "./action-result";
+import { slugify, truncateSlug } from "@/lib/slug";
+import { FORM_ERROR, PUBLISH_CONFIRM_FIELD } from "./action-result";
+
+export { PUBLISH_CONFIRM_FIELD };
 
 // One zod schema per admin form. They take what a browser posts (strings, repeated fields as
 // arrays) and give back a database row: snake_case columns, blank optional values as null,
@@ -18,6 +20,9 @@ export const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0
 const STORAGE_PATH_PATTERN = /^(?!\/)[A-Za-z0-9._\-/]+$/;
 const MAX_IMAGES = 20;
 const MAX_LINKED_PRODUCTS = 500;
+const MAX_LINKED_APPLICATIONS = 200;
+const MAX_FEATURES = 30;
+const MAX_FEATURE_LENGTH = 300;
 
 // Building blocks ---------------------------------------------------------------
 
@@ -89,9 +94,13 @@ const optionalDate = z
 
 const toArray = (value: unknown) => (value === undefined ? [] : Array.isArray(value) ? value : [value]);
 
-/** The slug the row will get: the typed one, else one made from the name or title. */
+/**
+ * The slug the row will get: the typed one, else one made from the name or title. A derived slug
+ * is shortened to the 100-character limit at a hyphen, so a long name never fails with a slug
+ * error the admin did not cause; a typed slug that is too long is refused instead.
+ */
 function slugFor(slug: string, source: string): string {
-  return slug || slugify(source);
+  return slug || truncateSlug(slugify(source), SLUG_MAX_LENGTH);
 }
 
 /**
@@ -153,7 +162,7 @@ const imageList = z
   .transform((items) => items.map((item) => item.trim()).filter(Boolean))
   .superRefine((items, ctx) => {
     if (items.length > MAX_IMAGES) {
-      ctx.addIssue({ code: "custom", message: `A project can have up to ${MAX_IMAGES} images` });
+      ctx.addIssue({ code: "custom", message: `Up to ${MAX_IMAGES} images are allowed` });
     } else if (!items.every(isValidStoragePath)) {
       ctx.addIssue({ code: "custom", message: "One of the image file paths is not valid" });
     }
@@ -165,6 +174,33 @@ const productIdList = z
     z.array(z.string().trim().regex(UUID_PATTERN, "Choose products from the list")).max(MAX_LINKED_PRODUCTS, "Too many products selected"),
   )
   .transform((ids) => [...new Set(ids)]);
+
+const applicationIdList = z
+  .preprocess(
+    toArray,
+    z
+      .array(z.string().trim().regex(UUID_PATTERN, "Choose applications from the list"))
+      .max(MAX_LINKED_APPLICATIONS, "Too many applications selected"),
+  )
+  .transform((ids) => [...new Set(ids)]);
+
+/** Features are typed one per line in a textarea; blank lines are dropped. */
+const featureList = z
+  .string()
+  .default("")
+  .transform((text) =>
+    normalizeNewlines(text)
+      .split("\n")
+      .map((item) => item.trim())
+      .filter(Boolean),
+  )
+  .superRefine((items, ctx) => {
+    if (items.length > MAX_FEATURES) {
+      ctx.addIssue({ code: "custom", message: `A product can have up to ${MAX_FEATURES} features` });
+    } else if (items.some((item) => item.length > MAX_FEATURE_LENGTH)) {
+      ctx.addIssue({ code: "custom", message: `Each feature must be ${MAX_FEATURE_LENGTH} characters or fewer` });
+    }
+  });
 
 export const projectSchema = z
   .object({
@@ -181,6 +217,45 @@ export const projectSchema = z
   })
   .superRefine((value, ctx) => checkSlug(value.slug, value.title, ctx))
   .transform((value) => ({ ...value, slug: slugFor(value.slug, value.title) }));
+
+// Products ----------------------------------------------------------------------
+
+/** The line the seed puts at the end of every overview: the owner deletes it once the values are checked. */
+const DATASHEET_REMINDER = /confirm\s+against\s+the\s+manufacturer['\u2019]s\s+datasheet\s+before\s+publishing/i;
+
+/** Whether an overview still carries the seeded "confirm against the datasheet" reminder. */
+export function hasDatasheetReminder(overview: string): boolean {
+  return DATASHEET_REMINDER.test(overview);
+}
+
+export const PUBLISH_NOTE_MESSAGE =
+  "The overview still contains the reminder \u201cConfirm against the manufacturer\u2019s datasheet before publishing\u201d. " +
+  "Check the specification values against the datasheet, then delete that line from the overview. " +
+  "To publish with the reminder visible to visitors anyway, tick the box and save again.";
+
+export const productSchema = z
+  .object({
+    name: requiredLine("Name", "Enter a name", 200),
+    slug: slugField,
+    category_id: z.string({ error: "Choose a category" }).trim().regex(UUID_PATTERN, "Choose a category"),
+    summary: paragraphs("Summary", 500),
+    overview: paragraphs("Overview", 20000),
+    features: featureList,
+    images: imageList,
+    datasheet_path: storagePath,
+    application_ids: applicationIdList,
+    /** Ticked after the form refused to publish while the datasheet reminder is still in the overview. */
+    confirm_unverified: published,
+    sort_order: sortOrder,
+    published,
+  })
+  .superRefine((value, ctx) => {
+    checkSlug(value.slug, value.name, ctx);
+    if (value.published && !value.confirm_unverified && hasDatasheetReminder(value.overview)) {
+      ctx.addIssue({ code: "custom", path: [PUBLISH_CONFIRM_FIELD], message: PUBLISH_NOTE_MESSAGE });
+    }
+  })
+  .transform((value) => ({ ...value, slug: slugFor(value.slug, value.name) }));
 
 // Parsing -------------------------------------------------------------------------
 

@@ -3,7 +3,7 @@
 import { useId, type ReactNode } from "react";
 import { useFormErrors } from "./EntityForm";
 
-const controlClass =
+export const controlClass =
   "mt-1.5 block min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-base text-slate-900 shadow-sm placeholder:text-slate-500 aria-[invalid=true]:border-red-600 aria-[invalid=true]:ring-1 aria-[invalid=true]:ring-red-600";
 
 type Option = { value: string; label: string };
