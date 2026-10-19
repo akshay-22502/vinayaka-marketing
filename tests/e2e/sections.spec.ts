@@ -196,10 +196,13 @@ test.describe("every new page", () => {
     }
   });
 
-  test("the quote button is on each of them", async ({ page }) => {
+  test("the quote button is on each of them, except the contact page, which holds the form itself", async ({ page }) => {
     for (const path of paths) {
       await page.goto(path);
-      await expect(page.getByTestId("quote-fab"), path).toHaveAttribute("href", "/quote");
+      const button = page.getByTestId("quote-fab");
+      // On /contact the button would sit on top of the form it points to.
+      if (path === "/contact") await expect(button, path).toHaveCount(0);
+      else await expect(button, path).toHaveAttribute("href", "/quote");
     }
   });
 });

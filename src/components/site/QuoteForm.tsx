@@ -36,16 +36,23 @@ type Feedback = {
   errors: FieldErrors;
   /** Text for the alert region (server messages, network trouble). */
   alert: string | null;
-  /** True when the alert only points at the highlighted fields, so it can go once they are fixed. */
-  alertPointsAtFields: boolean;
+  /**
+   * What the alert is about, so it can go away when that is settled: "fields" once the highlighted
+   * fields are fixed, "captcha" once the security check has a token again.
+   */
+  alertKind: "fields" | "captcha" | "failure" | null;
   /** Where to move the focus after this update: a field, the send button, or nowhere. */
   focus: QuoteField | "submit" | null;
 };
 
-const NO_FEEDBACK: Feedback = { errors: {}, alert: null, alertPointsAtFields: false, focus: null };
+const NO_FEEDBACK: Feedback = { errors: {}, alert: null, alertKind: null, focus: null };
 
 const CAPTCHA_PENDING_MESSAGE =
   "Please wait a moment for the security check to finish, then send your request again. If it does not appear, reload the page or contact us directly.";
+const CAPTCHA_EXPIRED_MESSAGE =
+  "The security check expired. Please wait a moment for it to refresh, then send your request again.";
+const CAPTCHA_ERROR_MESSAGE =
+  "The security check could not run. Please reload the page and try again, or contact us directly.";
 
 // Styling -------------------------------------------------------------------------------------
 
@@ -60,10 +67,11 @@ function OptionalMark() {
   return <span className="font-normal text-slate-600">{" (optional)"}</span>;
 }
 
-function FieldError({ id, message }: { id: string; message: string | undefined }) {
+/** `announce` makes screen readers read the message out when it appears (used for a refused file). */
+function FieldError({ id, message, announce = false }: { id: string; message: string | undefined; announce?: boolean }) {
   if (!message) return null;
   return (
-    <p id={id} className="mt-1.5 text-sm font-medium text-red-700">
+    <p id={id} role={announce ? "alert" : undefined} className="mt-1.5 text-sm font-medium text-red-700">
       {message}
     </p>
   );
@@ -172,7 +180,7 @@ function readValues(data: FormData): QuoteFormValues {
 /** Turns a failed answer into what the page shows: field errors plus any text that has no field. */
 function feedbackFor(outcome: Exclude<QuoteOutcome, { kind: "sent" }>): Feedback {
   if (outcome.kind === "failed") {
-    return { errors: {}, alert: outcome.message, alertPointsAtFields: false, focus: "submit" };
+    return { errors: {}, alert: outcome.message, alertKind: "failure", focus: "submit" };
   }
   const focus = firstInvalidField(outcome.errors);
   // An error for something that is not a field on this form can only be shown in the alert.
@@ -182,7 +190,7 @@ function feedbackFor(outcome: Exclude<QuoteOutcome, { kind: "sent" }>): Feedback
   return {
     errors: outcome.errors,
     alert: [outcome.message, ...loose].join(" "),
-    alertPointsAtFields: focus !== null && loose.length === 0,
+    alertKind: focus !== null && loose.length === 0 ? "fields" : "failure",
     focus: focus ?? "submit",
   };
 }
@@ -196,6 +204,8 @@ export function QuoteForm({ options, preselected, siteKey }: Props) {
   const thanksRef = useRef<HTMLHeadingElement>(null);
   const turnstileRef = useRef<TurnstileHandle>(null);
   const sending = useRef(false);
+  // The last file that was refused, and whether the visitor has been told once more at send time.
+  const refusedFile = useRef<{ problem: string; warned: boolean } | null>(null);
 
   const [status, setStatus] = useState<Status>("idle");
   const [team, setTeam] = useState<Country | null>(null);
@@ -220,19 +230,35 @@ export function QuoteForm({ options, preselected, siteKey }: Props) {
       if (current.errors[name] === undefined) return current;
       const remaining = { ...current.errors };
       delete remaining[name];
-      const done = Object.keys(remaining).length === 0 && current.alertPointsAtFields;
-      return { ...current, errors: remaining, alert: done ? null : current.alert, alertPointsAtFields: !done && current.alertPointsAtFields, focus: null };
+      const done = Object.keys(remaining).length === 0 && current.alertKind === "fields";
+      return {
+        ...current,
+        errors: remaining,
+        alert: done ? null : current.alert,
+        alertKind: done ? null : current.alertKind,
+        focus: null,
+      };
     });
+  }
+
+  // The security check's own events. A new token ends a "wait for the check" message.
+  function showCaptchaMessage(alert: string) {
+    setFeedback((current) => ({ ...current, alert, alertKind: "captcha", focus: null }));
+  }
+  function handleToken() {
+    setFeedback((current) => (current.alertKind === "captcha" ? { ...current, alert: null, alertKind: null, focus: null } : current));
   }
 
   // A file is checked as soon as it is chosen, so a too-big drawing is refused before the form is filled in.
   function checkChosenFile(input: HTMLInputElement) {
     const problem = validateAttachment(input.files?.[0] ?? null);
     if (!problem) {
+      refusedFile.current = null;
       clearError("attachment");
       return;
     }
     input.value = "";
+    refusedFile.current = { problem, warned: false };
     setFeedback((current) => ({ ...current, errors: { ...current.errors, attachment: problem }, focus: null }));
   }
 
@@ -252,13 +278,21 @@ export function QuoteForm({ options, preselected, siteKey }: Props) {
 
     // 1. The checks the browser can do. The server repeats all of them.
     const problems = checkQuoteForm(values);
+    // A file that was refused when it was chosen is no longer in the input, so without this the
+    // request would go out without it and the visitor would never be told. Say it once more here;
+    // sending again then continues without the file.
+    const refused = refusedFile.current;
+    if (refused && !values.attachment && !refused.warned) {
+      refused.warned = true;
+      problems.attachment = `${refused.problem} It was not attached. Choose another file, or send your request again to continue without it.`;
+    }
     if (Object.keys(problems).length > 0) {
-      setFeedback({ errors: problems, alert: null, alertPointsAtFields: false, focus: firstInvalidField(problems) });
+      setFeedback({ errors: problems, alert: null, alertKind: null, focus: firstInvalidField(problems) });
       return;
     }
     // 2. The captcha token, which the widget puts in the form once the check has passed.
     if (siteKey && text(data, "cf-turnstile-response").trim() === "") {
-      setFeedback({ ...NO_FEEDBACK, alert: CAPTCHA_PENDING_MESSAGE, focus: "submit" });
+      setFeedback({ ...NO_FEEDBACK, alert: CAPTCHA_PENDING_MESSAGE, alertKind: "captcha", focus: "submit" });
       return;
     }
     if (!values.attachment) data.delete("attachment");
@@ -401,7 +435,6 @@ export function QuoteForm({ options, preselected, siteKey }: Props) {
 
           {options.length > 0 ? (
             <fieldset
-              aria-invalid={errors.products ? true : undefined}
               aria-describedby={describedBy(`${prefix}-products-hint`, errors.products && `${prefix}-products-error`)}
               className="min-w-0"
             >
@@ -476,13 +509,21 @@ export function QuoteForm({ options, preselected, siteKey }: Props) {
             <p id={`${prefix}-attachment-hint`} className={hintClass}>
               PDF, JPG, PNG or DWG, up to 4 MB. Larger drawings can be emailed to us after we reply.
             </p>
-            <FieldError id={`${prefix}-attachment-error`} message={errors.attachment} />
+            <FieldError id={`${prefix}-attachment-error`} message={errors.attachment} announce />
           </div>
         </div>
       </div>
 
       <div className="mt-8 space-y-4 border-t border-slate-200 pt-6">
-        {siteKey ? <Turnstile ref={turnstileRef} siteKey={siteKey} /> : null}
+        {siteKey ? (
+          <Turnstile
+            ref={turnstileRef}
+            siteKey={siteKey}
+            onToken={handleToken}
+            onExpired={() => showCaptchaMessage(CAPTCHA_EXPIRED_MESSAGE)}
+            onError={() => showCaptchaMessage(CAPTCHA_ERROR_MESSAGE)}
+          />
+        ) : null}
 
         <div role="alert" className={feedback.alert ? "rounded-md border border-red-700 bg-red-50 px-4 py-3 text-base font-medium text-red-900" : undefined}>
           {feedback.alert}

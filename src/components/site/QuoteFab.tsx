@@ -6,15 +6,19 @@ import { usePathname } from "next/navigation";
 // /products/<category>/<product>: the segment after the category is the product slug.
 const PRODUCT_PATH = /^\/products\/[^/]+\/([^/]+)\/?$/;
 
+// Pages that hold the quote form themselves: the button would only sit on top of it.
+const PAGES_WITH_THE_FORM = new Set(["/quote", "/contact"]);
+
 /**
  * Floating "Request a quote" button, bottom right on every public page. On a
  * product page it opens the quote form with that product selected
- * (`/quote?product=<slug>`). It hides on the quote page itself.
+ * (`/quote?product=<slug>`). It hides on the pages that contain the form
+ * (/quote and /contact).
  */
 export function QuoteFab() {
   // Never null in the App Router; the fallback only satisfies the types.
   const pathname = usePathname() ?? "";
-  if (pathname === "/quote") return null;
+  if (PAGES_WITH_THE_FORM.has(pathname.replace(/\/+$/, "") || "/")) return null;
 
   const productSlug = PRODUCT_PATH.exec(pathname)?.[1];
   const href = productSlug ? `/quote?product=${productSlug}` : "/quote";

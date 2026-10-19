@@ -329,6 +329,54 @@ test.describe("checking the form before it is sent", () => {
   });
 });
 
+test.describe("a refused attachment", () => {
+  const refused = { name: "notes.txt", mimeType: "text/plain", buffer: Buffer.from("hello") };
+
+  test("is announced in an alert when the file is chosen", async ({ page }) => {
+    await page.goto("/quote");
+    await field(page, "Attachment (optional)").setInputFiles(refused);
+    await expect(formAlert(page)).toContainText("PDF, JPG, PNG or DWG");
+  });
+
+  test("is not dropped silently: the next send says it was not attached, and the one after sends without it", async ({ page }) => {
+    const bodies: string[] = [];
+    await page.route("**/api/quote", async (route) => {
+      bodies.push(route.request().postData() ?? "");
+      await route.fulfill({ status: 200, json: { ok: true, id: "33333333-3333-4333-8333-333333333333", team: "AE" } });
+    });
+    await page.goto("/quote");
+    await fillRequired(page, "refused");
+    await field(page, "Attachment (optional)").setInputFiles(refused);
+
+    await submitButton(page).click();
+    await expect(page.locator('[id$="-attachment-error"]')).toContainText("not attached");
+    await expect(field(page, "Attachment (optional)")).toBeFocused();
+    expect(bodies).toHaveLength(0);
+
+    await submitButton(page).click();
+    await expect(page.getByRole("heading", { level: 2, name: /Thank you.*UAE team/ })).toBeFocused();
+    expect(bodies).toHaveLength(1);
+    expect(bodies[0]).not.toContain("notes.txt");
+  });
+
+  test("a good file chosen afterwards is sent straight away", async ({ page }) => {
+    const bodies: string[] = [];
+    await page.route("**/api/quote", async (route) => {
+      bodies.push(route.request().postData() ?? "");
+      await route.fulfill({ status: 200, json: { ok: true, id: "44444444-4444-4444-8444-444444444444", team: "AE" } });
+    });
+    await page.goto("/quote");
+    await fillRequired(page, "replaced");
+    await field(page, "Attachment (optional)").setInputFiles(refused);
+    await field(page, "Attachment (optional)").setInputFiles({ name: "site.png", mimeType: "image/png", buffer: Buffer.from("png") });
+
+    await submitButton(page).click();
+    await expect(page.getByRole("heading", { level: 2, name: /Thank you.*UAE team/ })).toBeFocused();
+    expect(bodies).toHaveLength(1);
+    expect(bodies[0]).toContain("site.png");
+  });
+});
+
 test.describe("what the server says", () => {
   test("field errors from a 400 appear next to their fields, and the first is focused", async ({ page }) => {
     const seen = await mockQuote(page, 400, {
