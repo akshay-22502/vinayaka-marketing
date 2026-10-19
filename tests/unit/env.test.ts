@@ -5,6 +5,7 @@ import { env } from "@/lib/env";
 // Each case starts from a clean slate (a local, non-Vercel run) and sets only what it needs.
 beforeEach(() => {
   vi.stubEnv("NEXT_PUBLIC_SITE_URL", "");
+  vi.stubEnv("VERCEL", "");
   vi.stubEnv("VERCEL_ENV", "");
   vi.stubEnv("VERCEL_URL", "");
   vi.stubEnv("NODE_ENV", "test");
@@ -143,11 +144,18 @@ describe("env.devFallbacksAllowed", () => {
     }
   });
 
-  it("is off on a Vercel Production deployment even with the flag, but not on Preview", () => {
+  it("is off on any Vercel deployment even with the flag (Production, Preview and `vercel dev`)", () => {
     vi.stubEnv("ALLOW_DEV_FALLBACKS", "true");
-    vi.stubEnv("VERCEL_ENV", "production");
-    expect(env.devFallbacksAllowed()).toBe(false);
-    vi.stubEnv("VERCEL_ENV", "preview");
+    vi.stubEnv("VERCEL", "1"); // set by Vercel on every deployment
+    for (const vercelEnv of ["production", "preview", "development", ""]) {
+      vi.stubEnv("VERCEL_ENV", vercelEnv);
+      expect(env.devFallbacksAllowed()).toBe(false);
+    }
+  });
+
+  it("stays on locally, where Vercel's variables are not set (npm run dev, the E2E `next start`)", () => {
+    vi.stubEnv("ALLOW_DEV_FALLBACKS", "true");
+    vi.stubEnv("NODE_ENV", "production");
     expect(env.devFallbacksAllowed()).toBe(true);
   });
 });

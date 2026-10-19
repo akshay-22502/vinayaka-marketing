@@ -1,0 +1,17 @@
+-- Functions added in the future start with no access for the API roles.
+--
+-- Postgres lets PUBLIC execute every new function, and Supabase's own default privileges
+-- also grant EXECUTE on new functions in `public` to anon, authenticated and service_role.
+-- Anything in `public` is callable over the REST API (/rest/v1/rpc/<name>), so a function a
+-- later migration forgets to lock down would be open to every visitor. After this migration
+-- a new function can only be called by its owner and by service_role until the migration
+-- that creates it grants more (as 000002 and 000003 already do, explicitly, per function).
+--
+-- Two statements, because ALTER DEFAULT PRIVILEGES works per owner (here: postgres, the role
+-- that runs migrations) and a per-schema REVOKE cannot take away what is granted globally:
+--   1. drop the schema-level grants to anon and authenticated (service_role keeps its grant);
+--   2. drop the global grant to PUBLIC, which is what lets anon in through the back door.
+-- Functions that already exist are not touched: is_admin(), save_spec_table() and
+-- set_updated_at() keep the grants 000002 and 000003 gave them.
+alter default privileges in schema public revoke execute on functions from public, anon, authenticated;
+alter default privileges revoke execute on functions from public;

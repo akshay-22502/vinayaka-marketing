@@ -9,6 +9,8 @@ import { env } from "@/lib/env";
 import { getServiceClient } from "@/lib/supabase/service";
 
 export const runtime = "nodejs";
+// Seconds Vercel lets one request run: the captcha check (5 s) plus two sequential Resend calls (up to 8 s each).
+export const maxDuration = 60;
 
 const SERVER_ERROR_MESSAGE =
   "Something went wrong on our side, so your request was not sent. Please try again in a moment, or contact us directly.";

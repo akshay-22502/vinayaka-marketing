@@ -2,6 +2,8 @@
 //
 // Run by `npm run pretest:e2e`, right after `npm run db:reset` and before
 // `next build`. It:
+//   0. refuses to run when the shell has a live Supabase URL or service-role key
+//      exported (shell values beat .env.production.local in `next build`);
 //   1. publishes every seed product (the seed ships them unpublished);
 //   2. creates the E2E users: admin@e2e.test (admin) and user@e2e.test (not admin);
 //   3. writes .env.production.local so `next build` and `next start` see the
@@ -21,6 +23,7 @@
 import { rmSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { assertShellHasNoLiveSupabase } from "./lib/assert-local-supabase.ts";
 import { E2E_ADMIN_EMAIL, E2E_PASSWORD, E2E_USER_EMAIL } from "./lib/e2e-users.ts";
 import { readLocalSupabaseEnv } from "./lib/local-supabase.ts";
 import { ensureUser } from "./lib/users.ts";
@@ -44,6 +47,8 @@ async function waitForApi(service: SupabaseClient): Promise<void> {
 }
 
 async function main(): Promise<void> {
+  assertShellHasNoLiveSupabase("scripts/e2e-prepare.ts");
+
   const local = readLocalSupabaseEnv();
   const service = createClient(
     local.NEXT_PUBLIC_SUPABASE_URL,

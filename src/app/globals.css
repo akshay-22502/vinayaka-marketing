@@ -31,6 +31,12 @@ body {
   color: var(--color-slate-900);
 }
 
+/* The floating quote button covers the bottom 4.5rem or so (bottom right). When the browser
+   scrolls a focused element or an anchor into view, it stops short of that strip. */
+html {
+  scroll-padding-bottom: 5rem;
+}
+
 /* Keyboard focus: the brand orange ring is at least 3:1 against both white and navy. */
 :focus-visible {
   outline: 3px solid var(--color-orange);

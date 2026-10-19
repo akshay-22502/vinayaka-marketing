@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
 import { defineConfig, devices } from "@playwright/test";
+import { assertLocalSupabase } from "./scripts/lib/assert-local-supabase";
 
 // E2E runs against a production build (`npm run test:e2e` first runs the
 // `pretest:e2e` script: db:reset, scripts/e2e-prepare.ts, next build) so that
@@ -9,8 +10,10 @@ import { defineConfig, devices } from "@playwright/test";
 
 // scripts/e2e-prepare.ts writes the local Supabase keys and E2E flags here.
 // Loading it makes them available to test code (e.g. the service-role key) and
-// to the `next start` child process. Variables already set in the shell win.
+// to the `next start` child process. Variables already set in the shell win, which is why the
+// address is checked right after: a live project exported in the shell stops the run here.
 if (existsSync(".env.production.local")) process.loadEnvFile(".env.production.local");
+assertLocalSupabase(process.env.NEXT_PUBLIC_SUPABASE_URL, "playwright.config.ts");
 
 const PORT = 3100;
 

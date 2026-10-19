@@ -10,7 +10,7 @@ import { requireAdmin } from "@/lib/admin/require-admin";
 import { UUID_PATTERN } from "@/lib/admin/schemas";
 import { telHref } from "@/lib/contact";
 import type { Country } from "@/lib/content/types";
-import { countryName, formatDateTimeUtc } from "@/lib/format";
+import { countryName, formatDateTimeIst } from "@/lib/format";
 import { updateQuote } from "../actions";
 
 export const metadata: Metadata = { title: "Quote request" };
@@ -115,7 +115,7 @@ export default async function QuotePage({ params }: Props) {
       <div className="mt-3">
         <PageHeader
           title={quote.name}
-          intro={`Received ${formatDateTimeUtc(quote.created_at)}`}
+          intro={`Received ${formatDateTimeIst(quote.created_at)}`}
           action={
             <div className="flex flex-wrap items-center gap-2">
               <QuoteStatusBadge status={quote.status} />

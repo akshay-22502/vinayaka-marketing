@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { formatDateTimeUtc } from "@/lib/format";
+import { formatDateIst, formatDateTimeIst } from "@/lib/format";
 import {
   QUOTE_STATUS_LABELS,
   attachmentLabel,
@@ -13,19 +13,45 @@ import { QUOTE_STATUSES } from "@/lib/admin/quote-filters";
 
 // Small pure helpers behind the quote screens.
 
-describe("formatDateTimeUtc", () => {
-  it("writes a timestamp as day, month name, year and the UTC time", () => {
-    expect(formatDateTimeUtc("2026-10-19T14:05:09.123+00:00")).toBe("19 October 2026, 14:05 UTC");
-    expect(formatDateTimeUtc("2026-01-05T00:00:00Z")).toBe("5 January 2026, 00:00 UTC");
+describe("formatDateTimeIst", () => {
+  it("writes a timestamp as day, month name, year and the India time, labelled IST", () => {
+    expect(formatDateTimeIst("2026-10-19T14:05:09.123+00:00")).toBe("19 October 2026, 19:35 IST");
+    expect(formatDateTimeIst("2026-01-05T00:00:00Z")).toBe("5 January 2026, 05:30 IST");
   });
 
-  it("converts an offset to UTC", () => {
-    expect(formatDateTimeUtc("2026-10-19T23:30:00-02:00")).toBe("20 October 2026, 01:30 UTC");
+  it("moves a late-UTC timestamp onto the next day in India", () => {
+    expect(formatDateTimeIst("2026-10-19T22:30:00Z")).toBe("20 October 2026, 04:00 IST");
+    expect(formatDateTimeIst("2026-12-31T20:00:00Z")).toBe("1 January 2027, 01:30 IST");
+    expect(formatDateTimeIst("2026-10-19T18:29:59Z")).toBe("19 October 2026, 23:59 IST");
+    expect(formatDateTimeIst("2026-10-19T18:30:00Z")).toBe("20 October 2026, 00:00 IST");
+  });
+
+  it("converts an offset to India time", () => {
+    expect(formatDateTimeIst("2026-10-19T23:30:00-02:00")).toBe("20 October 2026, 07:00 IST");
+    expect(formatDateTimeIst("2026-10-19T12:00:00+05:30")).toBe("19 October 2026, 12:00 IST");
   });
 
   it("returns text that is not a timestamp unchanged", () => {
-    expect(formatDateTimeUtc("yesterday")).toBe("yesterday");
-    expect(formatDateTimeUtc("")).toBe("");
+    expect(formatDateTimeIst("yesterday")).toBe("yesterday");
+    expect(formatDateTimeIst("")).toBe("");
+  });
+});
+
+describe("formatDateIst", () => {
+  it("writes the day the timestamp falls on in India", () => {
+    expect(formatDateIst("2026-10-19T14:05:09.123+00:00")).toBe("19 October 2026");
+    expect(formatDateIst("2099-01-04T10:00:00Z")).toBe("4 January 2099");
+  });
+
+  it("is the next day for a timestamp after 18:30 UTC (midnight in India)", () => {
+    expect(formatDateIst("2026-10-19T18:29:59Z")).toBe("19 October 2026");
+    expect(formatDateIst("2026-10-19T18:30:00Z")).toBe("20 October 2026");
+    expect(formatDateIst("2026-10-19T22:30:00Z")).toBe("20 October 2026");
+    expect(formatDateIst("2026-12-31T23:59:00Z")).toBe("1 January 2027");
+  });
+
+  it("returns text that is not a timestamp unchanged", () => {
+    expect(formatDateIst("soon")).toBe("soon");
   });
 });
 

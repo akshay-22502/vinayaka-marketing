@@ -82,6 +82,32 @@ test.describe("robots.txt", () => {
   });
 });
 
+test.describe("brand icons", () => {
+  test("the head links the brand icons, and each one is served (not the create-next-app default)", async ({ page, request }) => {
+    await page.goto("/");
+
+    const svgHref = await page.locator('link[rel="icon"][type="image/svg+xml"]').getAttribute("href");
+    expect(svgHref, "svg icon link").toBeTruthy();
+    const svg = await request.get(svgHref!);
+    expect(svg.status()).toBe(200);
+    expect(svg.headers()["content-type"]).toContain("image/svg+xml");
+    const markup = await svg.text();
+    expect(markup).toContain("#253F70"); // navy
+    expect(markup).toContain("#D97A3A"); // orange
+
+    const appleHref = await page.locator('link[rel="apple-touch-icon"]').getAttribute("href");
+    expect(appleHref, "apple touch icon link").toBeTruthy();
+    const apple = await request.get(appleHref!);
+    expect(apple.status()).toBe(200);
+    expect(apple.headers()["content-type"]).toContain("image/png");
+
+    // Crawlers and old browsers ask for /favicon.ico directly.
+    const ico = await request.get("/favicon.ico");
+    expect(ico.status()).toBe(200);
+    expect(ico.headers()["content-type"]).toMatch(/icon/);
+  });
+});
+
 test.describe("page metadata", () => {
   test("every public page has its own title, description, canonical URL and Open Graph tags", async ({ page }) => {
     const titles = new Set<string>();

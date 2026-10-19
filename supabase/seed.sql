@@ -157,7 +157,7 @@ values (
   (select id from public.categories where slug = 'geomembrane'),
   'HDPE Geomembrane',
   'Smooth high-density polyethylene liner for landfills, ponds, canals and tanks, supplied from 0.5 mm to 2.0 mm thick.',
-  $md$Smooth HDPE geomembrane is extruded from high-density polyethylene resin with carbon black and antioxidant additives. It has very low permeability to liquids and gases, strong chemical resistance and good UV stability, which makes it a standard liner for landfills, mining ponds and water storage. Sheets are joined on site by hot-wedge or extrusion welding and the seams are tested before the liner is covered. Properties follow GRI-GM13.$md$,
+  $md$Smooth HDPE geomembrane is extruded from high-density polyethylene resin with carbon black and antioxidant additives. It has very low permeability to liquids and gases, strong chemical resistance and good UV stability, which makes it a standard liner for landfills, mining ponds and water storage. Sheets are joined on site by hot-wedge or extrusion welding and the seams are tested before the liner is covered. Values for 0.75 mm and thicker follow the GRI-GM13 minimums; confirm all values against the manufacturer's datasheet.$md$,
   array[
     'Very low permeability to liquids and gases',
     'Resistant to most acids, alkalis and landfill leachate',
@@ -202,7 +202,7 @@ values (
   (select id from public.categories where slug = 'geomembrane'),
   'LLDPE Geomembrane',
   'Flexible linear low-density polyethylene liner that follows uneven subgrades and tolerates differential settlement.',
-  $md$LLDPE geomembrane trades some of the stiffness of HDPE for much higher flexibility and elongation. It follows uneven subgrades, tolerates differential settlement and is easier to fold and deploy in cool weather. It suits pond and canal liners, heap leach pads, tank linings and landfill caps. Properties follow GRI-GM17.$md$,
+  $md$LLDPE geomembrane trades some of the stiffness of HDPE for much higher flexibility and elongation. It follows uneven subgrades, tolerates differential settlement and is easier to fold and deploy in cool weather. It suits pond and canal liners, heap leach pads, tank linings and landfill caps. The property values are typical figures; confirm them against the manufacturer's datasheet.$md$,
   array[
     'Flexible sheet that conforms to uneven ground',
     'High elongation at break for movement and settlement',

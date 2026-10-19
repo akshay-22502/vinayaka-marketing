@@ -255,6 +255,13 @@ describe("products", () => {
       expect(product.features.length, `${product.slug} features`).toBeLessThanOrEqual(6);
     }
   });
+
+  it("does not claim the LLDPE values follow GRI-GM17 (they sit below its minimums, Ruling R21)", () => {
+    const lldpe = seeded().find((product) => product.slug === "lldpe-geomembrane");
+    expect(lldpe?.overview).toBeDefined();
+    expect(lldpe?.overview).not.toMatch(/GM17|follow GRI/i);
+    expect(lldpe?.overview).toMatch(/typical figures; confirm them against the manufacturer's datasheet/);
+  });
 });
 
 describe("applications", () => {

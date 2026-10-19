@@ -115,10 +115,11 @@ describe("createCaptchaVerifier", () => {
     }
   });
 
-  it("ignores the flag on a Vercel production deployment", () => {
+  it.each(["production", "preview"])("ignores the flag on a Vercel %s deployment", (vercelEnv) => {
     vi.stubEnv("TURNSTILE_SECRET_KEY", "");
     vi.stubEnv("ALLOW_DEV_FALLBACKS", "true");
-    vi.stubEnv("VERCEL_ENV", "production");
+    vi.stubEnv("VERCEL", "1");
+    vi.stubEnv("VERCEL_ENV", vercelEnv);
     expect(() => createCaptchaVerifier()).toThrow(/TURNSTILE_SECRET_KEY/);
   });
 });

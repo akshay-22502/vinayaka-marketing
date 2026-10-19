@@ -15,7 +15,7 @@ import {
 import { QUOTE_STATUS_LABELS, productLabels } from "@/lib/admin/quote-view";
 import { requireAdmin } from "@/lib/admin/require-admin";
 import type { Country } from "@/lib/content/types";
-import { countryName, formatDate } from "@/lib/format";
+import { countryName, formatDateIst } from "@/lib/format";
 
 export const metadata: Metadata = { title: "Quote requests" };
 
@@ -164,7 +164,7 @@ export default async function QuotesPage({ searchParams }: Props) {
                     Products
                   </th>
                   <th scope="col" className={`${headCell} hidden sm:table-cell`}>
-                    Received
+                    Received (IST)
                   </th>
                   <th scope="col" className={headCell}>
                     Status
@@ -181,13 +181,13 @@ export default async function QuotesPage({ searchParams }: Props) {
                           {row.name}
                         </Link>
                         <span className="mt-1 block text-xs text-slate-600 sm:hidden">
-                          {countryName(row.country)} · {formatDate(row.created_at)}
+                          {countryName(row.country)} · {formatDateIst(row.created_at)} IST
                         </span>
                       </td>
                       <td className={`${cell} hidden min-w-0 [overflow-wrap:anywhere] sm:table-cell`}>{row.company || "–"}</td>
                       <td className={`${cell} hidden sm:table-cell`}>{countryName(row.country)}</td>
                       <td className={`${cell} hidden min-w-0 [overflow-wrap:anywhere] md:table-cell`}>{products.length > 0 ? products.join(", ") : "–"}</td>
-                      <td className={`${cell} hidden whitespace-nowrap sm:table-cell`}>{formatDate(row.created_at)}</td>
+                      <td className={`${cell} hidden whitespace-nowrap sm:table-cell`}>{formatDateIst(row.created_at)}</td>
                       <td className={cell}>
                         <div className="flex flex-col items-start gap-1.5">
                           <QuoteStatusBadge status={row.status} />

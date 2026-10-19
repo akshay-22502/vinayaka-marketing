@@ -24,6 +24,16 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
+        // No other site may put our pages in a frame (clickjacking; the admin login most of all).
+        // This only limits who may frame us: our own pages can still embed the Turnstile iframe.
+        // X-Frame-Options is the same rule for browsers that predate frame-ancestors.
+        source: "/:path*",
+        headers: [
+          { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
+          { key: "X-Frame-Options", value: "DENY" },
+        ],
+      },
+      {
         // The admin area (login included) must never show up in search results.
         source: "/admin/:path*",
         headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }],

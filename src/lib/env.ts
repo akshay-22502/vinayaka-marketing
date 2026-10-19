@@ -15,11 +15,14 @@ export function requireServerEnv(name: string): string {
  * makes the mailer log instead of send, because a sandbox cannot reach Cloudflare
  * or Resend. Any other value, including "1" or "TRUE", is off.
  *
- * As a safety net it is also off on a Vercel Production deployment, so a flag
- * copied there by mistake cannot switch the captcha off for real visitors.
+ * As a safety net it is also off on any Vercel deployment (Vercel sets VERCEL on
+ * Production, Preview and `vercel dev` alike), so a flag copied there by mistake
+ * cannot switch the captcha off for real visitors. Previews matter as much as
+ * Production: they share the live database and send real email. Local runs,
+ * including the E2E `next start`, have no VERCEL variable.
  */
 function devFallbacksAllowed(): boolean {
-  return process.env.ALLOW_DEV_FALLBACKS === "true" && process.env.VERCEL_ENV !== "production";
+  return process.env.ALLOW_DEV_FALLBACKS === "true" && !process.env.VERCEL;
 }
 
 /** True on a Vercel Preview deployment (a branch or pull request build), which must not be indexed. */

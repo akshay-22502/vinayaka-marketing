@@ -155,6 +155,16 @@ test.describe("catalogue", () => {
     );
   });
 
+  test("the page leaves room below a focused element so the floating quote button does not cover it", async ({ page }) => {
+    await page.goto("/products");
+    const button = page.getByTestId("quote-fab");
+    const room = await page.evaluate(() => parseFloat(getComputedStyle(document.documentElement).scrollPaddingBottom));
+    const covered = (await button.boundingBox())!;
+    const viewportHeight = page.viewportSize()!.height;
+    // scroll-padding-bottom reaches from the viewport's bottom edge past the button's top edge.
+    expect(room).toBeGreaterThanOrEqual(viewportHeight - covered.y);
+  });
+
   test("placeholder office details are plain text, not links", async ({ page }) => {
     await page.goto("/");
     const footer = page.getByRole("contentinfo");

@@ -573,7 +573,8 @@ test.describe("the inbox", () => {
     // Far-future dates put these rows above anything else; they are inserted out of order on purpose.
     await insertQuotes([
       { tag: "f3", status: "quoted", country: "IN", createdAt: "2099-01-02T10:00:00Z" },
-      { tag: "f1", status: "new", country: "IN", createdAt: "2099-01-04T10:00:00Z" },
+      // 22:30 UTC is already the next morning in India (04:00 IST on the 5th).
+      { tag: "f1", status: "new", country: "IN", createdAt: "2099-01-04T22:30:00Z" },
       { tag: "f4", status: "closed", country: "AE", createdAt: "2099-01-01T10:00:00Z" },
       { tag: "f2", status: "contacted", country: "AE", createdAt: "2099-01-03T10:00:00Z" },
     ]);
@@ -588,7 +589,13 @@ test.describe("the inbox", () => {
     await page.goto("/admin/quotes");
     const order = await page.getByRole("main").getByRole("row").locator("td:first-child a").allInnerTexts();
     expect(order.filter((text) => names.includes(text))).toEqual(names);
-    await expect(rowOf(page, names[0])).toContainText("4 January 2099");
+    await expect(rowOf(page, names[0])).toContainText("5 January 2099");
+    await expect(page.getByRole("columnheader", { name: "Received (IST)" })).toBeVisible();
+    await expect(rowOf(page, names[1])).toContainText("3 January 2099");
+
+    // The request page gives the time as well, in IST.
+    await rowLink(page, names[0]).click();
+    await expect(page.getByRole("main")).toContainText("Received 5 January 2099, 04:00 IST");
 
     await page.goto("/admin/quotes?status=new");
     expect(await shown()).toEqual([names[0]]);

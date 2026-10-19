@@ -534,6 +534,24 @@ describe("database guards", () => {
     expect(await check("authenticated", "public.set_updated_at()")).toBe(false);
   });
 
+  it("keeps a newly created function in public away from anon and signed-in users until it is granted", async () => {
+    // Migration 000006 changes the default privileges. Without it Postgres (and Supabase's own
+    // defaults) would let anon call any function a later migration adds, through /rest/v1/rpc.
+    const fn = `public.default_acl_check_${run}()`;
+    await db.query(`create function ${fn} returns integer language sql as 'select 1'`);
+    try {
+      for (const role of ["anon", "authenticated"]) {
+        const { rows } = await db.query<{ ok: boolean }>(
+          "select has_function_privilege($1, $2, 'execute') as ok",
+          [role, fn],
+        );
+        expect(rows[0].ok, `${role} can execute a new function`).toBe(false);
+      }
+    } finally {
+      await db.query(`drop function ${fn}`);
+    }
+  });
+
   it("is_admin() reflects the caller", async () => {
     expect((await admin.rpc("is_admin")).data).toBe(true);
     expect((await member.rpc("is_admin")).data).toBe(false);

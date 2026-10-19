@@ -29,16 +29,44 @@ export function formatDate(isoDate: string): string {
   return `${Number(match[3])} ${month} ${match[1]}`;
 }
 
+// India Standard Time is UTC+5:30 all year (no daylight saving), so a fixed offset is exact.
+const IST_OFFSET_MS = (5 * 60 + 30) * 60 * 1000;
+
 /**
- * A stored timestamp written out as "19 October 2026, 14:05 UTC". Always in UTC and done by hand, so
- * the text does not depend on the server's time zone. Text that is not a timestamp comes back unchanged.
+ * A stored timestamp moved onto India time and read with the UTC getters, so the result does
+ * not depend on the server's time zone. Undefined when the text is not a timestamp.
  */
-export function formatDateTimeUtc(timestamp: string): string {
+function inIst(timestamp: string): Date | undefined {
+  if (!/^\d{4}-\d{2}-\d{2}/.test(timestamp)) return undefined;
   const time = new Date(timestamp);
-  if (!/^\d{4}-\d{2}-\d{2}/.test(timestamp) || Number.isNaN(time.getTime())) return timestamp;
-  const hours = String(time.getUTCHours()).padStart(2, "0");
-  const minutes = String(time.getUTCMinutes()).padStart(2, "0");
-  return `${time.getUTCDate()} ${MONTHS[time.getUTCMonth()]} ${time.getUTCFullYear()}, ${hours}:${minutes} UTC`;
+  if (Number.isNaN(time.getTime())) return undefined;
+  return new Date(time.getTime() + IST_OFFSET_MS);
+}
+
+function dayAndMonth(ist: Date): string {
+  return `${ist.getUTCDate()} ${MONTHS[ist.getUTCMonth()]} ${ist.getUTCFullYear()}`;
+}
+
+/**
+ * A stored timestamp written out in India time as "19 October 2026, 19:35 IST" (Ruling R19: the
+ * admin shows IST, whatever the server's or the browser's zone). Done by hand, so the text is the
+ * same everywhere. Text that is not a timestamp comes back unchanged.
+ */
+export function formatDateTimeIst(timestamp: string): string {
+  const ist = inIst(timestamp);
+  if (!ist) return timestamp;
+  const hours = String(ist.getUTCHours()).padStart(2, "0");
+  const minutes = String(ist.getUTCMinutes()).padStart(2, "0");
+  return `${dayAndMonth(ist)}, ${hours}:${minutes} IST`;
+}
+
+/**
+ * The day a stored timestamp falls on in India, as "20 October 2026": a request that arrives at
+ * 22:30 UTC is already on the next day there. Text that is not a timestamp comes back unchanged.
+ */
+export function formatDateIst(timestamp: string): string {
+  const ist = inIst(timestamp);
+  return ist ? dayAndMonth(ist) : timestamp;
 }
 
 /** How a country code is written on the site. */

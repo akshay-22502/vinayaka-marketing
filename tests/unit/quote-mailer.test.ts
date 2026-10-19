@@ -133,9 +133,10 @@ describe("createMailer without a Resend key", () => {
     expect(logged).toContain("Subject");
   });
 
-  it("still throws on a Vercel production deployment, even with the flag", () => {
+  it.each(["production", "preview"])("still throws on a Vercel %s deployment, even with the flag", (vercelEnv) => {
     vi.stubEnv("ALLOW_DEV_FALLBACKS", "true");
-    vi.stubEnv("VERCEL_ENV", "production");
+    vi.stubEnv("VERCEL", "1");
+    vi.stubEnv("VERCEL_ENV", vercelEnv);
     expect(() => createMailer()).toThrow(/RESEND_API_KEY/);
   });
 });

@@ -11,6 +11,7 @@ const CONFIG = {
   RESEND_API_KEY: "re_key",
   IP_HASH_SALT: "salt",
   ALLOW_DEV_FALLBACKS: "",
+  VERCEL: "",
   VERCEL_ENV: "",
 };
 
@@ -32,6 +33,13 @@ beforeEach(async () => {
 afterEach(() => {
   vi.unstubAllEnvs();
   vi.restoreAllMocks();
+});
+
+describe("POST /api/quote time limit", () => {
+  it("allows 60 seconds: the captcha check (5 s) plus two sequential Resend calls (8 s each) can outrun the default", async () => {
+    const route = await import("@/app/api/quote/route");
+    expect(route.maxDuration).toBe(60);
+  });
 });
 
 describe("POST /api/quote configuration", () => {
@@ -88,9 +96,10 @@ describe("POST /api/quote configuration", () => {
     }
   });
 
-  it("ignores the dev flag on a Vercel production deployment", async () => {
+  it.each(["production", "preview"])("ignores the dev flag on a Vercel %s deployment", async (vercelEnv) => {
     vi.stubEnv("ALLOW_DEV_FALLBACKS", "true");
-    vi.stubEnv("VERCEL_ENV", "production");
+    vi.stubEnv("VERCEL", "1");
+    vi.stubEnv("VERCEL_ENV", vercelEnv);
     vi.stubEnv("TURNSTILE_SECRET_KEY", "");
     vi.stubEnv("RESEND_API_KEY", "");
     expect((await POST(request())).status).toBe(500);

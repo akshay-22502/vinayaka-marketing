@@ -44,6 +44,7 @@ beforeAll(async () => {
   vi.stubEnv("TURNSTILE_SECRET_KEY", "");
   vi.stubEnv("RESEND_API_KEY", "");
   vi.stubEnv("IP_HASH_SALT", SALT);
+  vi.stubEnv("VERCEL", "");
   vi.stubEnv("VERCEL_ENV", "");
   ({ POST } = await import("@/app/api/quote/route"));
 

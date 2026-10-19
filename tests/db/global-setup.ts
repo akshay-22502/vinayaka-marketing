@@ -1,8 +1,18 @@
+import {
+  assertLocalSupabase,
+  isLocalDatabaseUrl,
+  isLocalSupabaseUrl,
+} from "../../scripts/lib/assert-local-supabase";
 import { readLocalSupabaseEnv } from "../../scripts/lib/local-supabase";
 
 /**
  * Runs once before the db project's tests: points them at the local Supabase
- * stack. Variables that are already set (for example in CI) win.
+ * stack, and refuses to run against anything else (these tests reset data and
+ * create users, so they must never touch the live project).
+ *
+ * Shell variables are kept only when all four are set and the URLs point at this
+ * machine (for example in CI). Otherwise all four come from `supabase status`
+ * and replace what the shell had, so a live value can never be mixed with local ones.
  */
 export default function setup(): void {
   const needed = [
@@ -11,9 +21,12 @@ export default function setup(): void {
     "SUPABASE_SERVICE_ROLE_KEY",
     "SUPABASE_DB_URL",
   ];
-  if (needed.every((name) => process.env[name])) return;
+  const keepShellValues =
+    needed.every((name) => process.env[name]) &&
+    isLocalSupabaseUrl(process.env.NEXT_PUBLIC_SUPABASE_URL) &&
+    isLocalDatabaseUrl(process.env.SUPABASE_DB_URL);
 
-  for (const [name, value] of Object.entries(readLocalSupabaseEnv())) {
-    process.env[name] ??= value;
-  }
+  if (!keepShellValues) Object.assign(process.env, readLocalSupabaseEnv());
+
+  assertLocalSupabase(process.env.NEXT_PUBLIC_SUPABASE_URL, "tests/db/global-setup.ts");
 }
