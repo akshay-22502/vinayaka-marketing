@@ -1,0 +1,59 @@
+// What a save or delete Server Action returns to the admin form, and how database errors
+// become messages a person can act on. Plain module (no "use server"), so client components
+// and tests can import its types and constants.
+
+/** Success, or a message per form field. The key `form` is for a problem that belongs to no single field. */
+export type ActionResult = { ok: true } | { ok: false; errors: Record<string, string> };
+export type ActionFailure = Extract<ActionResult, { ok: false }>;
+
+/** The key under which a message that belongs to the whole form is returned. */
+export const FORM_ERROR = "form";
+
+export const SLUG_TAKEN_MESSAGE = "This URL slug is already used";
+export const CATEGORY_HAS_PRODUCTS_MESSAGE = "This category still has products. Move or delete them first.";
+export const NOT_FOUND_MESSAGE = "This item no longer exists. It may have been deleted in another window.";
+const VALUE_TAKEN_MESSAGE = "Another item already uses one of these values. Change it and try again.";
+const LINKED_MESSAGE = "A linked item no longer exists or is still in use. Reload the page and try again.";
+const SAVE_FAILED_MESSAGE = "Could not save. Please try again.";
+
+export function failure(errors: Record<string, string>): ActionFailure {
+  return { ok: false, errors };
+}
+
+type PgErrorLike = { code?: unknown; message?: unknown; details?: unknown; constraint?: unknown };
+
+function text(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
+
+/** Whether a unique violation was on a slug column (`categories_slug_key`, `projects_slug_key`, ...). */
+function isSlugViolation(error: PgErrorLike): boolean {
+  const message = text(error.message);
+  // The name of the constraint that was broken: given on its own, or quoted in the message.
+  const constraint = text(error.constraint) || /unique constraint "([^"]+)"/.exec(message)?.[1];
+  if (constraint) return /slug/i.test(constraint);
+  return /slug/i.test(`${message} ${text(error.details)}`);
+}
+
+/**
+ * Turns a Postgres/PostgREST error into form messages:
+ *  - unique violation on a slug: "This URL slug is already used" on the slug field (never a 500);
+ *  - deleting a category that still has products (`products.category_id` is ON DELETE RESTRICT):
+ *    a friendly message for the form;
+ *  - anything else: a generic message. The database text is never shown to the admin.
+ */
+export function fromPgError(error: unknown): ActionFailure {
+  const pg: PgErrorLike = typeof error === "object" && error !== null ? error : {};
+  const code = text(pg.code);
+
+  if (code === "23505") {
+    return failure(isSlugViolation(pg) ? { slug: SLUG_TAKEN_MESSAGE } : { [FORM_ERROR]: VALUE_TAKEN_MESSAGE });
+  }
+
+  if (code === "23503") {
+    const detail = `${text(pg.message)} ${text(pg.details)} ${text(pg.constraint)}`;
+    return failure({ [FORM_ERROR]: /products_category_id/.test(detail) ? CATEGORY_HAS_PRODUCTS_MESSAGE : LINKED_MESSAGE });
+  }
+
+  return failure({ [FORM_ERROR]: SAVE_FAILED_MESSAGE });
+}

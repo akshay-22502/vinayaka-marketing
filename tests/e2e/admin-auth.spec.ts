@@ -1,15 +1,9 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import {
-  combineChunks,
-  createChunks,
-  createServerClient,
-  stringFromBase64URL,
-  stringToBase64URL,
-} from "@supabase/ssr";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { expect, test, type BrowserContext, type Locator, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import { E2E_ADMIN_EMAIL, E2E_PASSWORD, E2E_USER_EMAIL } from "../../scripts/lib/e2e-users";
+import { BASE_URL, envVar, readSession, signInWithCookie } from "../support/admin-session";
 
 // Admin sign-in and session handling, against the local Supabase stack with the users that
 // scripts/e2e-prepare.ts creates: admin@e2e.test (admin) and user@e2e.test (not an admin).
@@ -18,78 +12,16 @@ import { E2E_ADMIN_EMAIL, E2E_PASSWORD, E2E_USER_EMAIL } from "../../scripts/lib
 // form itself type a password; the others start from a session cookie made with the same
 // @supabase/ssr code the app uses.
 
-const BASE_URL = "http://localhost:3100";
 const RUN = Date.now().toString(36);
 const FIXTURE_EMAIL = `admin-auth-fixture-${RUN}@example.com`;
 
 const NOT_ADMIN_MESSAGE = "This account does not have admin access";
 const WRONG_PASSWORD_MESSAGE = "Incorrect email or password";
 
-function envVar(name: string): string {
-  const value = process.env[name];
-  if (!value) throw new Error(`The e2e env (${name}) is not loaded.`);
-  return value;
-}
-
 function service(): SupabaseClient {
   return createClient(envVar("NEXT_PUBLIC_SUPABASE_URL"), envVar("SUPABASE_SERVICE_ROLE_KEY"), {
     auth: { persistSession: false, autoRefreshToken: false },
   });
-}
-
-type SessionCookie = { name: string; value: string };
-type StoredSession = { access_token: string; refresh_token: string; expires_at: number };
-
-const AUTH_COOKIE = /^(sb-.+-auth-token)(\.\d+)?$/;
-const VALUE_PREFIX = "base64-";
-
-/** The session inside the (possibly chunked) Supabase auth cookie. */
-async function readSession(cookies: SessionCookie[]): Promise<StoredSession> {
-  const base = cookies.map((cookie) => AUTH_COOKIE.exec(cookie.name)?.[1]).find(Boolean);
-  if (!base) throw new Error("There is no Supabase auth cookie.");
-  const value = await combineChunks(base, (name) => cookies.find((cookie) => cookie.name === name)?.value);
-  if (!value?.startsWith(VALUE_PREFIX)) throw new Error("The auth cookie is not in the base64 format.");
-  return JSON.parse(stringFromBase64URL(value.slice(VALUE_PREFIX.length))) as StoredSession;
-}
-
-/** The same cookies with the access token marked as expired an hour ago (the refresh token is intact). */
-async function withExpiredAccessToken(cookies: SessionCookie[]): Promise<SessionCookie[]> {
-  const base = cookies.map((cookie) => AUTH_COOKIE.exec(cookie.name)?.[1]).find(Boolean)!;
-  const session = { ...(await readSession(cookies)), expires_at: Math.floor(Date.now() / 1000) - 3600 };
-  const value = VALUE_PREFIX + stringToBase64URL(JSON.stringify(session));
-  return createChunks(base, value).map(({ name, value }) => ({ name, value }));
-}
-
-/**
- * Signs in with @supabase/ssr and puts the resulting session cookies into the browser context;
- * returns them. With `expired`, the access token in them is already out of date.
- */
-async function signInWithCookie(
-  context: BrowserContext,
-  email: string,
-  opts: { expired?: boolean } = {},
-): Promise<SessionCookie[]> {
-  const jar = new Map<string, string>();
-  const supabase = createServerClient(
-    envVar("NEXT_PUBLIC_SUPABASE_URL"),
-    envVar("NEXT_PUBLIC_SUPABASE_ANON_KEY"),
-    {
-      cookies: {
-        getAll: () => [...jar].map(([name, value]) => ({ name, value })),
-        setAll: (cookies) => {
-          for (const { name, value } of cookies) jar.set(name, value);
-        },
-      },
-    },
-  );
-  const { error } = await supabase.auth.signInWithPassword({ email, password: E2E_PASSWORD });
-  if (error) throw new Error(`Could not sign in ${email}: ${error.message}`);
-  expect(jar.size, "session cookies written").toBeGreaterThan(0);
-
-  let cookies = [...jar].map(([name, value]) => ({ name, value }));
-  if (opts.expired) cookies = await withExpiredAccessToken(cookies);
-  await context.addCookies(cookies.map(({ name, value }) => ({ name, value, url: BASE_URL })));
-  return cookies;
 }
 
 /** The error in the login form. (Next.js adds its own role="alert" route announcer to every page.) */
