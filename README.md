@@ -18,7 +18,9 @@ Next.js 15 (App Router) + React 19 + TypeScript + Tailwind CSS 4, hosted on Verc
 - **Public pages** are server-rendered from Supabase with the anonymous key (row-level security shows only `published` rows) and cached for an hour. Every save in `/admin` revalidates the whole site, so changes appear within seconds.
 - **`/admin`** uses the signed-in user's own Supabase session, so Postgres row-level security is the real permission check, not just the UI. Only the user listed in the `admins` table can enter or write. `src/middleware.ts` runs only for `/admin` to keep that session fresh.
 - **`POST /api/quote`** validates the form, checks the Turnstile captcha and a rate limit (5 requests per IP hash per rolling hour), saves the request (and any attachment) with the service-role key, and only then sends the emails. If email fails the request is still saved and the admin inbox shows "Email not sent". Recipients come only from the `quote_recipients` table (set in Admin > Settings), never from the request.
+- **`GET /api/keep-alive`** is called once a day by Vercel Cron (schedule in `vercel.json`, protected by `CRON_SECRET`). It reads one row from Supabase so that a free-tier project does not pause after a quiet week and start losing quote requests. A paid Supabase plan is still the right choice for a business site.
 - Seeded products are **unpublished**, so unchecked spec values never go live by accident.
+- Every page is sent with `Content-Security-Policy: frame-ancestors 'none'` and `X-Frame-Options: DENY` (`next.config.ts`), so no other site can put it in a frame. The admin panel shows dates and times in India time (IST).
 
 Where things live:
 
@@ -27,16 +29,19 @@ Where things live:
 | `src/app/(site)/` | Public pages (home, products, applications, certifications, projects, about, contact, quote) |
 | `src/app/admin/` | Admin panel: `login/`, and `(protected)/` with one folder per section (page, `[id]/page`, `actions.ts`) |
 | `src/app/api/quote/route.ts` | The quote endpoint |
-| `src/lib/env.ts` | Environment variable access and production checks |
+| `src/app/api/keep-alive/route.ts`, `vercel.json` | The daily keep-alive ping and its Vercel Cron schedule |
+| `src/app/icon.svg`, `src/app/apple-icon.png`, `src/app/favicon.ico` | Browser-tab and home-screen icons (a stand-in until the final logo arrives) |
+| `src/lib/env.ts` | Environment variable access and production checks (the dev fallbacks are refused on Vercel) |
 | `src/lib/supabase/` | `public` (anon, public reads), `server` (cookie session), `service` (service role, server only), `browser` clients |
 | `src/lib/content/` | Public reads (`queries.ts`) and the spec-table transform (`spec-grid.ts`) |
 | `src/lib/quote/` | Quote pipeline: schema, IP hash, Turnstile, mailer, email text, store, handler |
 | `src/lib/admin/` | Admin validation schemas, `requireAdmin()`, action results, upload rules |
 | `src/components/site/`, `src/components/admin/` | UI components |
-| `supabase/migrations/` | Schema, row-level security and storage buckets, spec-table function, attachment and media limits |
+| `supabase/migrations/` | Schema, row-level security and storage buckets, spec-table function, attachment and media limits, default function privileges |
 | `supabase/seed.sql` | Starter catalogue (4 categories, 7 unpublished products, 6 applications, placeholder settings) |
 | `scripts/create-admin.ts` | Creates the admin account (see below) |
 | `scripts/e2e-prepare.ts` | Prepares the local database and build for the end-to-end tests |
+| `scripts/lib/assert-local-supabase.ts` | The guard that stops the db and e2e tests from running against anything but the local Supabase |
 | `tests/unit`, `tests/db`, `tests/e2e`, `tests/support` | Vitest unit tests, Vitest tests against the local database, Playwright tests, shared helpers |
 | `public/placeholders/`, `public/brand/` | Placeholder images (used until real photos are uploaded) and logo files |
 
@@ -70,9 +75,9 @@ You need: **Node.js 22 or newer** (22.6+ is required because `create-admin` and 
    | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `ANON_KEY` |
    | `SUPABASE_SERVICE_ROLE_KEY` | `SERVICE_ROLE_KEY` |
    | `IP_HASH_SALT` | any text, for example `local` |
-   | `ALLOW_DEV_FALLBACKS` | `true` (local only) |
+   | `ALLOW_DEV_FALLBACKS` | `true` (local only; the site ignores it on every Vercel deployment) |
 
-   Leave the Turnstile, Resend and `MAIL_FROM` lines empty. `NEXT_PUBLIC_SITE_URL` can stay empty for `npm run dev`, but a local `npm run build` needs `NEXT_PUBLIC_SITE_URL=http://localhost:3000` in `.env.local` (production builds refuse to run without it). With `ALLOW_DEV_FALLBACKS=true` the captcha passes and emails are printed to the terminal instead of sent. Without that flag a missing Turnstile or Resend key makes `/api/quote` fail with a 500.
+   Leave the Turnstile, Resend, `MAIL_FROM` and `CRON_SECRET` lines empty. `NEXT_PUBLIC_SITE_URL` can stay empty for `npm run dev`, but a local `npm run build` needs `NEXT_PUBLIC_SITE_URL=http://localhost:3000` in `.env.local` (production builds refuse to run without it). With `ALLOW_DEV_FALLBACKS=true` the captcha passes and emails are printed to the terminal instead of sent. Without that flag a missing Turnstile or Resend key makes `/api/quote` fail with a 500.
 
 3. Run the site:
 
@@ -95,7 +100,7 @@ Other scripts: `npm run build` / `npm start` (production build), `npm run lint`,
 Things to know:
 
 - `npm run test:e2e` leaves a file called `.env.production.local` behind (local keys, `NEXT_PUBLIC_SITE_URL=http://localhost:3100`, `ALLOW_DEV_FALLBACKS=true`). **Delete it before running a real production build** (`npm run build`) on your machine, and put `NEXT_PUBLIC_SITE_URL=http://localhost:3000` in `.env.local` for that build. It is git-ignored.
-- Never put `ADMIN_PASSWORD` or `ALLOW_DEV_FALLBACKS` in Vercel's environment variables. `.env.example` lists every variable the site reads, with a comment for each.
+- Never put `ADMIN_PASSWORD` or `ALLOW_DEV_FALLBACKS` in Vercel's environment variables (the site refuses the dev fallbacks on any Vercel deployment, Production and Preview alike, but do not rely on that). `.env.example` lists every variable the site reads, with a comment for each.
 
 ---
 
@@ -115,7 +120,7 @@ Notes:
 - **Chromium for Playwright.** On a fresh machine run `npx playwright install chromium` once (`@playwright/test` is pinned to 1.56.1 in `package.json`).
 - **`npm run test:e2e` prepares everything itself.** Its `pretest:e2e` step runs `npm run db:reset`, then `scripts/e2e-prepare.ts` (publishes the seed products, creates `admin@e2e.test` and `user@e2e.test`, writes `.env.production.local`, clears `.next`), then `next build`. Playwright then starts `next start` on port 3100. Always use `npm run test:e2e`, not `npx playwright test` on its own: running Playwright twice against the same build can serve stale cached pages.
 - **`npm run verify`** is lint, typecheck, unit tests, `npm run db:reset`, `npm run test:db`, then `npm run test:e2e`. It takes about 4 to 5 minutes and resets the local database more than once. It passes when run twice in a row.
-- **The db and e2e tests write to the local database** (they reset it). They read the local keys from `npx supabase status`; if `NEXT_PUBLIC_SUPABASE_URL` and the other Supabase variables are already set in your shell, those win. Never have the live project's keys exported in the terminal when you run them.
+- **The db and e2e tests write to the local database** (they reset it and create users), so they only ever run against the local stack. `npm run test:db` takes all four Supabase values from `npx supabase status` and replaces whatever your shell holds. `npm run test:e2e` and Playwright stop with an error if your shell has a Supabase URL that is not on this machine (127.0.0.1, localhost or [::1]), or a `SUPABASE_SERVICE_ROLE_KEY` but no URL: run `unset NEXT_PUBLIC_SUPABASE_URL NEXT_PUBLIC_SUPABASE_ANON_KEY SUPABASE_SERVICE_ROLE_KEY SUPABASE_DB_URL` and try again. Keep the live project's keys out of your terminal anyway; only `npm run create-admin` is meant to use them.
 - If Docker is not running, start it first, then `npm run db:start`. `npx supabase status` shows whether the stack is up.
 - The real Turnstile widget and real Resend delivery cannot be tested here (the tests use a stub and the dev fallbacks). They are checked by hand during launch (steps 6, 7 and 10 below).
 
@@ -131,7 +136,7 @@ Do these in order. Steps marked **[browser]** are clicks on a website; steps mar
 
 **Before you start, you need accounts for:** GitHub (the code lives in `akshay-22502/vinayaka-marketing`), [Supabase](https://supabase.com), [Vercel](https://vercel.com), [Resend](https://resend.com), [Cloudflare](https://dash.cloudflare.com) (only for the Turnstile captcha, which is free), and login access to wherever the DNS records for terratechbharat.com are managed (your domain registrar, or Cloudflare if the domain is set up there). Use a password manager: you will handle several secret keys.
 
-Two plan notes: free Supabase projects are paused after a period of no activity (see [If something goes wrong](#if-something-goes-wrong)), and Vercel's free "Hobby" plan is meant for personal, non-commercial use. For a business website check Vercel's current terms and consider a paid plan before going live.
+Two plan notes: free Supabase projects are paused after a period of no activity (the site pings Supabase once a day to prevent that, see step 8, and [If something goes wrong](#if-something-goes-wrong) says what to do if it still happens), and Vercel's free "Hobby" plan is meant for personal, non-commercial use. For a business website a **paid Supabase plan is recommended** (a paused database drops quote requests, and a daily ping is only a safety net), and you should check Vercel's current terms and consider a paid plan before going live.
 
 **The website code must be on the `main` branch on GitHub before you start step 3** (that is, after the pull request has been merged): step 3 downloads the code from there to run the database commands, and step 8 makes Vercel publish it. Vercel publishes the repository's production branch as the live site; if that is not `main`, choose it under **Settings > Git > Production Branch** after importing.
 
@@ -165,7 +170,7 @@ npx supabase db push --dry-run                    # optional: lists the migratio
 npx supabase db push                              # may ask for the database password; answer Y to apply all migrations
 ```
 
-You should see the five migrations (`20261019000001_schema` up to `20261019000005_public_media_limits`) applied without errors.
+You should see the six migrations (`20261019000001_schema` up to `20261019000006_default_function_privileges`) applied without errors.
 
 ### 4. Load the starter content, once [terminal]
 
@@ -191,7 +196,7 @@ Open **Project Settings > API** (on newer dashboards the keys are on a separate 
 - The **anon** key (public) is `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
 - The **service_role** key (secret, click to reveal) is `SUPABASE_SERVICE_ROLE_KEY`. It bypasses all security rules: never put it in code, chat or email.
 
-The site was built and tested with the long `eyJ...` style keys (the "legacy" anon and service_role keys). If your dashboard only offers Supabase's newer `sb_publishable_...` and `sb_secret_...` keys, use them in the same two variables (publishable for `NEXT_PUBLIC_SUPABASE_ANON_KEY`, secret for `SUPABASE_SERVICE_ROLE_KEY`). They were not tested with this site, so after the first deploy do the admin sign-in and a test quote in step 10 (step 9 uses the secret key as well). If either fails, tell the developer.
+The site was built and tested with the long `eyJ...` style keys (the "legacy" anon and service_role keys). If your dashboard only offers Supabase's newer `sb_publishable_...` and `sb_secret_...` keys, use them in the same two variables (publishable for `NEXT_PUBLIC_SUPABASE_ANON_KEY`, secret for `SUPABASE_SERVICE_ROLE_KEY`). They were not tested with this site, so the admin sign-in and the test quote in step 10 (mandatory before the DNS switch) are what prove they work; step 9 uses the secret key as well. If either fails, tell the developer.
 
 ### 6. Create the Turnstile captcha [browser]
 
@@ -228,9 +233,12 @@ Emails are sent from `TerraTechBharat <quotes@terratechbharat.com>`. That addres
 | `TURNSTILE_SECRET_KEY` | Step 6: Secret Key | Production + Preview | **Secret**, server only |
 | `RESEND_API_KEY` | Step 7: API key | Production + Preview | **Secret**, server only |
 | `IP_HASH_SALT` | Invent a long random text. In a terminal: `openssl rand -hex 32`. Store it in your password manager | Production + Preview | **Secret**, server only |
+| `CRON_SECRET` | Invent another long random text (`openssl rand -hex 32`) and store it in your password manager. Vercel sends it with its daily keep-alive call (below); without it that call is refused | Production + Preview | **Secret**, server only |
 | `MAIL_FROM` | Optional. Leave unset to send from `TerraTechBharat <quotes@terratechbharat.com>` | Production + Preview | Server only |
 
-**Never add** `ALLOW_DEV_FALLBACKS` (it switches the captcha off and stops real emails) or `ADMIN_PASSWORD` (only used for one terminal command in step 9) to Vercel. `VERCEL_ENV` and `VERCEL_URL` are filled in by Vercel itself.
+**Never add** `ALLOW_DEV_FALLBACKS` (it switches the captcha off and stops real emails; the site ignores it on Vercel, but do not add it) or `ADMIN_PASSWORD` (only used for one terminal command in step 9) to Vercel. `VERCEL`, `VERCEL_ENV` and `VERCEL_URL` are filled in by Vercel itself.
+
+**Keep-alive.** `vercel.json` tells Vercel to call `/api/keep-alive` once a day (around 03:17 UTC) with `CRON_SECRET`. The call reads one row from Supabase, which counts as activity, so a free Supabase project is not paused after a quiet week and quote requests are not lost. It is a safety net, not a guarantee: for a business website a paid Supabase plan is still the recommended choice. Vercel only runs cron jobs on the Production deployment, which is what step 8 creates. After the first deploy check **Settings > Cron Jobs** in the project: `/api/keep-alive` should be listed.
 
 Values starting with `NEXT_PUBLIC_` are baked into the site when it is built. If you change any variable later, go to **Deployments**, open the menu (three dots) on the latest deployment and click **Redeploy**, otherwise the old value stays in use.
 
@@ -247,9 +255,10 @@ printf 'service_role key: '; read -rs SUPABASE_SERVICE_ROLE_KEY; echo; export SU
 Paste the key from step 5 (nothing appears) and press Enter. Then:
 
 ```bash
-NEXT_PUBLIC_SUPABASE_URL='https://<reference>.supabase.co' npm run -s create-admin -- owner@example.com
-unset SUPABASE_SERVICE_ROLE_KEY
+NEXT_PUBLIC_SUPABASE_URL='https://<reference>.supabase.co' npm run -s create-admin -- owner@example.com; unset SUPABASE_SERVICE_ROLE_KEY
 ```
+
+Keep `; unset SUPABASE_SERVICE_ROLE_KEY` on that same line. On a separate line, a pasted block would feed the `unset` command to the hidden password prompt. If you interrupt the command (Ctrl-C), the `unset` does not run: type `unset SUPABASE_SERVICE_ROLE_KEY` yourself before you do anything else, or close the terminal window.
 
 - Replace `owner@example.com` with the owner's email address (this is the login).
 - It asks for a password twice (hidden, at least 10 characters). **This is the recommended way**: generate the password in your password manager and paste it at the prompt.
@@ -257,9 +266,11 @@ unset SUPABASE_SERVICE_ROLE_KEY
 - Keep `-s` and `--` in the command as shown. `-s` stops npm from echoing the command line, which matters if a password is ever given as an argument (not recommended). `--` is needed so that flags such as `--force` reach the script instead of npm.
 - It prints "Using the Supabase project at ..." before doing anything. If it says "local Supabase stack" instead, the two variables were not set, so stop and check.
 - It makes one admin. A second, different address is refused unless you add `--force`. Running the command again for the same email resets that password (that is also how to recover a forgotten password).
-- Do not set `ADMIN_PASSWORD` on Vercel. The `service_role` key belongs only in Vercel's environment variables and, for this one command, in your terminal.
+- Do not set `ADMIN_PASSWORD` on Vercel. The `service_role` key belongs only in Vercel's environment variables, in your password manager and, for this one command, in your terminal.
 
 ### 10. First sign-in and a test quote [browser]
+
+**This step is mandatory before the DNS switch (step 12).** It is the only place the real Turnstile captcha, real email delivery and, if you use them, the newer `sb_publishable_...` / `sb_secret_...` Supabase keys are tested, because none of them can be tried on a developer's machine. Do not switch the domain until every check below passes.
 
 1. Open `https://<project>.vercel.app` (from step 8). The home page should load, with the four categories. The product lists are empty until step 11.
 2. In Cloudflare, open the Turnstile widget from step 6 and add `<project>.vercel.app` to its hostnames so the captcha works on this temporary address. Remove it again after step 12.
@@ -278,6 +289,7 @@ unset SUPABASE_SERVICE_ROLE_KEY
 
    If anything fails, see [If something goes wrong](#if-something-goes-wrong).
 7. In the Quotes list set the two test requests to **Closed**.
+8. In Vercel open the project, then **Settings > Cron Jobs**: `/api/keep-alive` should be listed (if it is not, check that `CRON_SECRET` is set under **Production** and redeploy).
 
 ### 11. Check and publish the content [browser]
 
@@ -296,7 +308,7 @@ A product only shows on the website if its category is published too.
 
 ### 12. Switch terratechbharat.com to the new site [browser + DNS]
 
-Do this when step 10 and step 11 are done.
+Do this only when step 10 (mandatory) and step 11 are done.
 
 1. In Vercel open the project, then **Settings > Domains**. Click **Add** and enter `www.terratechbharat.com`; add `terratechbharat.com` as well. Make `www.terratechbharat.com` the main address and let `terratechbharat.com` redirect to it (this must match `NEXT_PUBLIC_SITE_URL` from step 8; if you prefer the address without `www`, change that variable and redeploy).
 2. Vercel lists the DNS records to create. At the time of writing these are an **A** record for `terratechbharat.com` pointing to `76.76.21.21` and a **CNAME** record for `www` pointing to `cname.vercel-dns.com`. Use exactly what the Domains screen shows if it differs.
@@ -320,6 +332,7 @@ Right after the domain switch:
 - [ ] Every product you want visible is checked against its datasheet, has the reminder line removed, and is **Published**.
 - [ ] Open the live pages once: Home, a category, a product (check the specification table), Applications, Contact, Quote.
 - [ ] Optional: add `https://www.terratechbharat.com/sitemap.xml` in Google Search Console so Google finds the pages.
+- [ ] Send the final logo to the developer. The browser-tab icon is a stand-in (a navy and orange "T") until then. To replace it: `src/app/icon.svg` (square SVG), `src/app/apple-icon.png` (180 x 180 PNG, no transparency) and `src/app/favicon.ico` (16, 32 and 48 px), then merge and let Vercel redeploy. The logo images in `public/brand/` are replaced the same way.
 - [ ] Revoke the old Gmail app password (next section).
 
 From then on:
@@ -334,7 +347,7 @@ From then on:
 
 ## If something goes wrong
 
-- **The site shows an error page after a quiet period.** A free Supabase project is paused when it has had no activity for a while. Open the Supabase dashboard and click **Restore project**; the site comes back in a few minutes. A paid plan avoids this.
+- **The site shows an error page after a quiet period.** A free Supabase project is paused when it has had no activity for a while. Open the Supabase dashboard and click **Restore project**; the site comes back in a few minutes. The daily keep-alive (step 8) is meant to prevent this, but only a paid plan rules it out. Then check **Settings > Cron Jobs** in Vercel: if `/api/keep-alive` is missing or its runs fail with 401, `CRON_SECRET` is not set for Production (add it and **Redeploy**).
 - **A quote shows "Email not sent".** Check in this order: (1) Admin > Settings has an email for that country; (2) Resend > Domains shows `terratechbharat.com` as **Verified**; (3) `RESEND_API_KEY` is correct in Vercel (then **Redeploy**); (4) Vercel > project > **Logs** for the error. The request itself is always saved.
 - **The seed (step 4) failed or stopped halfway.** Because it runs as one transaction (`-1`), a failure leaves the database as it was: read the error, fix the cause and run the same command again. Typical errors: `password authentication failed` (wrong database password), `Network is unreachable` (use the Session pooler details, step 4), `psql: command not found` (install the PostgreSQL client tools), and `duplicate key value violates unique constraint "categories_slug_key"` (the starter content is already loaded: do not run it again). If you ever ran it without `-1` and it stopped halfway, ask a developer to clear the half-loaded content before you have entered anything of your own (Supabase **SQL Editor**: `truncate public.categories, public.applications cascade;`) and then run the command again.
 - **The quote form says the captcha failed or never loads.** The Turnstile hostnames must include the address you are visiting, and both Turnstile keys must be set in Vercel (then **Redeploy**).
