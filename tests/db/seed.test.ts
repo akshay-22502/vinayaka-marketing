@@ -256,11 +256,14 @@ describe("products", () => {
     }
   });
 
-  it("does not claim the LLDPE values follow GRI-GM17 (they sit below its minimums, Ruling R21)", () => {
-    const lldpe = seeded().find((product) => product.slug === "lldpe-geomembrane");
-    expect(lldpe?.overview).toBeDefined();
-    expect(lldpe?.overview).not.toMatch(/GM17|follow GRI/i);
-    expect(lldpe?.overview).toMatch(/typical figures; confirm them against the manufacturer's datasheet/);
+  it("claims no standard compliance in any overview; the reminder line is the only caveat (Ruling R21)", () => {
+    // The values are unverified until the owner checks them, and a standards sentence would stay on the
+    // live page after the guarded reminder line is removed, so no overview names GRI-GM13/GM17.
+    const products = seeded();
+    expect(products.length).toBeGreaterThan(0);
+    for (const product of products) {
+      expect(product.overview, product.slug).not.toMatch(/GM1[37]|follow(s)? (the )?GRI|typical figures/i);
+    }
   });
 });
 

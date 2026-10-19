@@ -13,5 +13,9 @@
 --   2. drop the global grant to PUBLIC, which is what lets anon in through the back door.
 -- Functions that already exist are not touched: is_admin(), save_spec_table() and
 -- set_updated_at() keep the grants 000002 and 000003 gave them.
-alter default privileges in schema public revoke execute on functions from public, anon, authenticated;
-alter default privileges revoke execute on functions from public;
+--
+-- Cost: a future function that must be callable by an API role needs its own GRANT, e.g. an
+-- RLS helper (to anon/authenticated) or an auth hook (to supabase_auth_admin). Without it the
+-- call fails with "permission denied for function", i.e. it fails closed.
+alter default privileges for role postgres in schema public revoke execute on functions from public, anon, authenticated;
+alter default privileges for role postgres revoke execute on functions from public;
