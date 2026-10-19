@@ -10,6 +10,7 @@ import { SectionHeading } from "@/components/site/SectionHeading";
 import { getProject, getProjects } from "@/lib/content/queries";
 import { placeLabel } from "@/lib/format";
 import { APPLICATION_PLACEHOLDER } from "@/lib/media";
+import { metaDescription, pageMetadata } from "@/lib/seo";
 import { publicMediaUrl } from "@/lib/storage";
 
 export const revalidate = 3600;
@@ -30,7 +31,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const project = await loadProject(slug);
   if (!project) return {};
-  return { title: project.title, description: project.summary || undefined };
+  return pageMetadata({
+    title: project.title,
+    description: metaDescription(project.summary),
+    path: `/projects/${project.slug}`,
+    image: publicMediaUrl(project.coverImage),
+  });
 }
 
 export default async function ProjectPage({ params }: Props) {

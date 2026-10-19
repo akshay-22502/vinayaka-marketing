@@ -1,16 +1,17 @@
-import type { Metadata } from "next";
 import { ApplicationCard } from "@/components/site/ApplicationCard";
 import { QuoteCta } from "@/components/site/QuoteCta";
 import { SectionHeading } from "@/components/site/SectionHeading";
 import { getApplications } from "@/lib/content/queries";
+import { pageMetadata } from "@/lib/seo";
 
 export const revalidate = 3600;
 
-export const metadata: Metadata = {
+export const metadata = pageMetadata({
   title: "Applications",
   description:
     "Where geogrids, geomembranes, geotextiles and geocells are used: roads, slopes, landfills, ponds, erosion control and railways.",
-};
+  path: "/applications",
+});
 
 export default async function ApplicationsPage() {
   const applications = await getApplications();

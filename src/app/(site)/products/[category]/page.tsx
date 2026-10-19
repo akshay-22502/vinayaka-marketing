@@ -6,6 +6,8 @@ import { ProductCard } from "@/components/site/ProductCard";
 import { QuoteCta } from "@/components/site/QuoteCta";
 import { SectionHeading } from "@/components/site/SectionHeading";
 import { getCategories, getCategoryWithProducts } from "@/lib/content/queries";
+import { metaDescription, pageMetadata } from "@/lib/seo";
+import { publicMediaUrl } from "@/lib/storage";
 
 export const revalidate = 3600;
 // Categories published after the build are rendered on first visit, then cached.
@@ -25,7 +27,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { category: slug } = await params;
   const category = await loadCategory(slug);
   if (!category) return {};
-  return { title: category.name, description: category.intro.slice(0, 200) };
+  return pageMetadata({
+    title: category.name,
+    description: metaDescription(category.intro),
+    path: `/products/${category.slug}`,
+    image: publicMediaUrl(category.imagePath),
+  });
 }
 
 export default async function CategoryPage({ params }: Props) {

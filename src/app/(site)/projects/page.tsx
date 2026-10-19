@@ -1,16 +1,18 @@
-import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { ProjectCard } from "@/components/site/ProjectCard";
 import { QuoteCta } from "@/components/site/QuoteCta";
 import { SectionHeading } from "@/components/site/SectionHeading";
 import { getProjects } from "@/lib/content/queries";
+import { pageMetadata } from "@/lib/seo";
 
 export const revalidate = 3600;
 
-export const metadata: Metadata = {
+export const metadata = pageMetadata({
   title: "Projects",
-  description: "Projects in India and the UAE where TerraTechBharat geosynthetics have been supplied.",
-};
+  description:
+    "Projects in India and the UAE where TerraTechBharat geosynthetics have been supplied.",
+  path: "/projects",
+});
 
 export default async function ProjectsPage() {
   const projects = await getProjects();

@@ -1,3 +1,6 @@
+import type { Metadata } from "next";
+import { cache } from "react";
+import { JsonLd } from "@/components/site/JsonLd";
 import { ApplicationsStrip } from "@/components/site/home/ApplicationsStrip";
 import { CategoryTiles } from "@/components/site/home/CategoryTiles";
 import { CertificationsStrip } from "@/components/site/home/CertificationsStrip";
@@ -13,12 +16,28 @@ import {
   getProjects,
   getSiteSettings,
 } from "@/lib/content/queries";
+import { metaDescription, organizationJsonLd, pageMetadata } from "@/lib/seo";
 
 export const revalidate = 3600;
 
+const FALLBACK_TAGLINE = "Geosynthetic solutions for India and the UAE";
+
+// Called by both generateMetadata and the page; cache() makes it one query per request.
+const loadSettings = cache(getSiteSettings);
+
+export async function generateMetadata(): Promise<Metadata> {
+  const settings = await loadSettings();
+  const tagline = settings.tagline.trim() || FALLBACK_TAGLINE;
+  return pageMetadata({
+    title: { absolute: `TerraTechBharat | ${tagline}` },
+    description: metaDescription(settings.heroText) ?? metaDescription(tagline),
+    path: "/",
+  });
+}
+
 export default async function HomePage() {
   const [settings, categories, applications, certifications, projects] = await Promise.all([
-    getSiteSettings(),
+    loadSettings(),
     getCategories(),
     getApplications(),
     getCertifications(),
@@ -27,6 +46,7 @@ export default async function HomePage() {
 
   return (
     <>
+      <JsonLd data={organizationJsonLd()} />
       <Hero tagline={settings.tagline} title={settings.heroTitle} text={settings.heroText} />
       <CategoryTiles categories={categories} />
       <ApplicationsStrip applications={applications} />

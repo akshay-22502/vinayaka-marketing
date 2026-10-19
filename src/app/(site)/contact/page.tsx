@@ -1,15 +1,17 @@
-import type { Metadata } from "next";
 import { OfficeDetails } from "@/components/site/OfficeDetails";
 import { QuoteCta } from "@/components/site/QuoteCta";
 import { SectionHeading } from "@/components/site/SectionHeading";
 import { getSiteSettings } from "@/lib/content/queries";
+import { pageMetadata } from "@/lib/seo";
 
 export const revalidate = 3600;
 
-export const metadata: Metadata = {
+export const metadata = pageMetadata({
   title: "Contact",
-  description: "Contact the TerraTechBharat offices in India and the UAE, or request a quote online.",
-};
+  description:
+    "Contact the TerraTechBharat offices in India and the UAE, or request a quote online.",
+  path: "/contact",
+});
 
 export default async function ContactPage() {
   const settings = await getSiteSettings();

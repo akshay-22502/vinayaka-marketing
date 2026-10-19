@@ -1,17 +1,18 @@
-import type { Metadata } from "next";
 import { Markdown } from "@/components/site/Markdown";
 import { Presence } from "@/components/site/home/Presence";
 import { QuoteCta } from "@/components/site/QuoteCta";
 import { SectionHeading } from "@/components/site/SectionHeading";
 import { getSiteSettings } from "@/lib/content/queries";
+import { pageMetadata } from "@/lib/seo";
 
 export const revalidate = 3600;
 
-export const metadata: Metadata = {
+export const metadata = pageMetadata({
   title: "About",
   description:
     "TerraTechBharat supplies geogrids, geomembranes, geotextiles and geocells for projects in India and the UAE.",
-};
+  path: "/about",
+});
 
 export default async function AboutPage() {
   const settings = await getSiteSettings();

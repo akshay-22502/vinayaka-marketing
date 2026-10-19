@@ -5,6 +5,7 @@ import { cache } from "react";
 import { Breadcrumb } from "@/components/site/Breadcrumb";
 import { Markdown } from "@/components/site/Markdown";
 import { ProductGallery } from "@/components/site/ProductGallery";
+import { ProductJsonLd } from "@/components/site/ProductJsonLd";
 import { QuoteCta } from "@/components/site/QuoteCta";
 import { SpecTable } from "@/components/site/SpecTable";
 import {
@@ -13,6 +14,7 @@ import {
   getProduct,
 } from "@/lib/content/queries";
 import { categoryPlaceholder } from "@/lib/media";
+import { metaDescription, pageMetadata } from "@/lib/seo";
 import { publicMediaUrl } from "@/lib/storage";
 
 export const revalidate = 3600;
@@ -42,7 +44,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { category, product: slug } = await params;
   const product = await loadProduct(category, slug);
   if (!product) return {};
-  return { title: product.name, description: product.summary };
+  return pageMetadata({
+    title: product.name,
+    description: metaDescription(product.summary),
+    path: `/products/${product.categorySlug}/${product.slug}`,
+    image: publicMediaUrl(product.coverImage),
+  });
 }
 
 export default async function ProductPage({ params }: Props) {
@@ -61,6 +68,7 @@ export default async function ProductPage({ params }: Props) {
 
   return (
     <div className="container-page py-8 sm:py-12">
+      <ProductJsonLd product={product} categoryName={categoryName} />
       <Breadcrumb
         items={[
           { label: "Home", href: "/" },

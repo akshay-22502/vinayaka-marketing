@@ -1,4 +1,3 @@
-import type { Metadata } from "next";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 import { QuoteCta } from "@/components/site/QuoteCta";
@@ -6,14 +5,17 @@ import { SectionHeading } from "@/components/site/SectionHeading";
 import { getCertifications } from "@/lib/content/queries";
 import type { Certification } from "@/lib/content/types";
 import { formatDate } from "@/lib/format";
+import { pageMetadata } from "@/lib/seo";
 import { publicMediaUrl } from "@/lib/storage";
 
 export const revalidate = 3600;
 
-export const metadata: Metadata = {
+export const metadata = pageMetadata({
   title: "Certifications",
-  description: "Quality certifications and test approvals held by TerraTechBharat and its products.",
-};
+  description:
+    "Quality certifications and test approvals held by TerraTechBharat and its products.",
+  path: "/certifications",
+});
 
 function CertificationCard({ certification }: { certification: Certification }) {
   const image = publicMediaUrl(certification.imagePath);

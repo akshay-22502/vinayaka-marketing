@@ -1,16 +1,17 @@
-import type { Metadata } from "next";
 import { CategoryTile } from "@/components/site/CategoryTile";
 import { QuoteCta } from "@/components/site/QuoteCta";
 import { SectionHeading } from "@/components/site/SectionHeading";
 import { getCategories } from "@/lib/content/queries";
+import { pageMetadata } from "@/lib/seo";
 
 export const revalidate = 3600;
 
-export const metadata: Metadata = {
+export const metadata = pageMetadata({
   title: "Products",
   description:
     "Geogrids, geomembranes, geotextiles and geocells with full specification tables, for projects in India and the UAE.",
-};
+  path: "/products",
+});
 
 export default async function ProductsPage() {
   const categories = await getCategories();

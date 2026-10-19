@@ -9,6 +9,7 @@ import { QuoteCta } from "@/components/site/QuoteCta";
 import { SectionHeading } from "@/components/site/SectionHeading";
 import { getApplication, getApplications } from "@/lib/content/queries";
 import { APPLICATION_PLACEHOLDER } from "@/lib/media";
+import { metaDescription, pageMetadata } from "@/lib/seo";
 import { publicMediaUrl } from "@/lib/storage";
 
 export const revalidate = 3600;
@@ -29,7 +30,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const application = await loadApplication(slug);
   if (!application) return {};
-  return { title: application.name, description: application.summary };
+  return pageMetadata({
+    title: application.name,
+    description: metaDescription(application.summary),
+    path: `/applications/${application.slug}`,
+    image: publicMediaUrl(application.imagePath),
+  });
 }
 
 export default async function ApplicationPage({ params }: Props) {
