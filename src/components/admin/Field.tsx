@@ -12,7 +12,7 @@ type Props = {
   label: string;
   /** The form field name; also where the message of a failed save is looked up. */
   name: string;
-  type?: "text" | "textarea" | "select" | "date";
+  type?: "text" | "textarea" | "select" | "date" | "email" | "tel";
   defaultValue?: string | number | null;
   hint?: string;
   required?: boolean;
@@ -21,7 +21,7 @@ type Props = {
   rows?: number;
   maxLength?: number;
   options?: Option[];
-  inputMode?: "numeric" | "text";
+  inputMode?: "numeric" | "text" | "email" | "tel";
   placeholder?: string;
   spellCheck?: boolean;
 };

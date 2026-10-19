@@ -20,7 +20,7 @@ export function createFakeSupabase(options: {
       const query: Query = { table, ops: [] };
       queries.push(query);
       const builder: Record<string, unknown> = {};
-      for (const name of ["insert", "update", "delete", "select", "eq", "in", "single", "order"]) {
+      for (const name of ["insert", "update", "upsert", "delete", "select", "eq", "in", "single", "order"]) {
         builder[name] = (...args: unknown[]) => {
           query.ops.push({ name, args });
           return builder;

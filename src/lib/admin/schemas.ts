@@ -38,12 +38,12 @@ function requiredLine(label: string, required: string, max: number) {
 }
 
 /** Optional one-line text; blank is "". */
-function line(label: string, max: number) {
+export function line(label: string, max: number) {
   return z.string().trim().max(max, `${label} must be ${max} characters or fewer`).default("");
 }
 
 /** Optional multi-line text (browsers post line breaks as CRLF). */
-function paragraphs(label: string, max: number) {
+export function paragraphs(label: string, max: number) {
   return z
     .string()
     .overwrite(normalizeNewlines)

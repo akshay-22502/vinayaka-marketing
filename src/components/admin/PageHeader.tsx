@@ -5,7 +5,7 @@ export function PageHeader({ title, intro, action }: { title: string; intro?: st
   return (
     <div className="flex flex-wrap items-start justify-between gap-4">
       <div className="min-w-0">
-        <h1 className="text-2xl font-bold tracking-tight text-navy sm:text-3xl">{title}</h1>
+        <h1 className="break-words text-2xl font-bold tracking-tight text-navy sm:text-3xl">{title}</h1>
         {intro ? <p className="mt-1 text-slate-600">{intro}</p> : null}
       </div>
       {action}
