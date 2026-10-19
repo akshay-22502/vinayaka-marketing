@@ -95,13 +95,14 @@ All content tables have `id uuid`, `created_at`, `updated_at`, plus `published b
 - **certifications:** name, issuer, valid_until (nullable), file_path, image_path, sort_order, published
 - **projects:** slug, title, location, country (`IN` | `AE`), summary, body, images, sort_order, published
 - **project_products:** project_id, product_id
-- **site_settings:** a single row holding tagline, home hero text, about text, office details for India and UAE (address, phone, whatsapp, public email), and quote recipient emails per country
+- **site_settings:** a single row holding tagline, home hero text, about text, office details for India and UAE (address, phone, whatsapp, public email)
+- **quote_recipients:** country (`IN` | `AE`, primary key), email. A separate table so anonymous users can never read it
 - **quote_requests:** name, company, email, phone, country (`IN` | `AE`), products (text[]), quantity, project_location, message, attachment_path, status (`new` | `contacted` | `quoted` | `closed`), admin_notes, email_sent boolean, ip_hash
 - **admins:** user_id (references auth.users)
 
 ### Row-level security
 
-- Anonymous users can `select` published rows of content tables and the public fields of `site_settings`. They cannot read quote recipient emails.
+- Anonymous users can `select` published rows of content tables and `site_settings`. They cannot read `quote_recipients`.
 - Anonymous users cannot touch `quote_requests` directly. Inserts happen only through `/api/quote` using the service role after validation.
 - Admins (`auth.uid()` present in `admins`) have full access to everything.
 
@@ -117,16 +118,16 @@ All content tables have `id uuid`, `created_at`, `updated_at`, plus `published b
 - **CRUD screens** for categories, products, applications, certifications and projects. Each has a published toggle, drag/number sort order and image/PDF upload with preview.
 - **Spec table editor** on the product screen: a grid with properties as rows and models as columns. Rows and columns can be added, removed and reordered, and cells are edited inline. It saves in one transaction.
 - **Quote requests:** table filtered by status and country, detail view with attachment download, status change and notes.
-- **Settings:** office details, recipient emails, homepage and about text.
-- Every save revalidates the affected public routes.
+- **Settings:** office details, quote recipient email per country, homepage and about text.
+- Every save revalidates the public site (`revalidatePath('/', 'layout')`; the site is small enough that revalidating everything is simplest).
 
 ## 7. Quote request flow
 
-1. A buyer fills the form: name*, company, email*, phone*, country* (India/UAE), products (multi-select, pre-filled), quantity, project location, message*, optional attachment (PDF/JPG/PNG/DWG ≤ 10 MB).
+1. A buyer fills the form: name*, company, email*, phone*, country* (India/UAE), products (multi-select, pre-filled), quantity, project location, message*, optional attachment (PDF/JPG/PNG/DWG ≤ 4 MB, the most a Vercel function accepts in one request; larger drawings can be emailed after first contact).
 2. The client renders Cloudflare Turnstile. The form posts to `/api/quote`.
 3. The server validates input with zod, verifies the Turnstile token, and applies a rate limit of 5 requests per IP hash per hour, checked against `quote_requests`.
 4. The server uploads any attachment to `quote-attachments` and inserts the row with `status = new`. **The insert happens before any email.**
-5. The server sends the notification to the recipient email for that country (from `site_settings`; never from the request) and a confirmation to the buyer through Resend, from `quotes@terratechbharat.com`. It then sets `email_sent`.
+5. The server sends the notification to the recipient email for that country (from `quote_recipients`; never from the request) and a confirmation to the buyer through Resend, from `quotes@terratechbharat.com`. It then sets `email_sent`.
 6. If email fails, the request stays saved with `email_sent = false` and shows a badge in admin. The buyer still sees success.
 
 ## 8. Seed content
