@@ -76,11 +76,23 @@ function siteUrl(): string {
   );
 }
 
+/**
+ * The public Cloudflare Turnstile site key, or undefined when it is not set (the quote form then
+ * shows no captcha, which is how the sandbox and E2E run). Blank counts as unset.
+ */
+function turnstileSiteKey(): string | undefined {
+  // Written out in full (not process.env[name]) so Next can inline it.
+  return process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim() || undefined;
+}
+
 export const env = {
   requireServerEnv,
   devFallbacksAllowed,
   get NEXT_PUBLIC_SITE_URL(): string {
     return siteUrl();
+  },
+  get NEXT_PUBLIC_TURNSTILE_SITE_KEY(): string | undefined {
+    return turnstileSiteKey();
   },
   isVercelPreview,
 };

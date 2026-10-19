@@ -107,6 +107,20 @@ describe("env.NEXT_PUBLIC_SITE_URL", () => {
   });
 });
 
+describe("env.NEXT_PUBLIC_TURNSTILE_SITE_KEY", () => {
+  it("is the trimmed key when set", () => {
+    vi.stubEnv("NEXT_PUBLIC_TURNSTILE_SITE_KEY", "  0x4AAAAAAA-site-key ");
+    expect(env.NEXT_PUBLIC_TURNSTILE_SITE_KEY).toBe("0x4AAAAAAA-site-key");
+  });
+
+  it("is undefined when unset or blank, so the quote form shows no captcha", () => {
+    vi.stubEnv("NEXT_PUBLIC_TURNSTILE_SITE_KEY", "");
+    expect(env.NEXT_PUBLIC_TURNSTILE_SITE_KEY).toBeUndefined();
+    vi.stubEnv("NEXT_PUBLIC_TURNSTILE_SITE_KEY", "   ");
+    expect(env.NEXT_PUBLIC_TURNSTILE_SITE_KEY).toBeUndefined();
+  });
+});
+
 describe("env.isVercelPreview", () => {
   it("is true only for a Vercel Preview deployment", () => {
     expect(env.isVercelPreview()).toBe(false);

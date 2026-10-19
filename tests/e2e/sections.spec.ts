@@ -172,8 +172,9 @@ test.describe("contact", () => {
     // Bracketed placeholders are never tel:, mailto: or wa.me links (ruling R6).
     await expect(main.locator('a[href^="tel:"], a[href^="mailto:"], a[href*="wa.me"]')).toHaveCount(0);
 
-    // Until the quote form is embedded here, a clear call to action leads to it.
-    await expect(main.getByRole("link", { name: "Request a quote" })).toHaveAttribute("href", "/quote");
+    // The quote form is embedded under the offices (tests/e2e/quote.spec.ts covers using it).
+    await expect(main.getByRole("heading", { level: 2, name: "Request a quote" })).toBeVisible();
+    await expect(main.getByRole("form", { name: "Quote request" })).toBeVisible();
   });
 });
 

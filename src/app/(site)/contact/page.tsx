@@ -1,7 +1,8 @@
 import { OfficeDetails } from "@/components/site/OfficeDetails";
-import { QuoteCta } from "@/components/site/QuoteCta";
+import { QuoteForm } from "@/components/site/QuoteForm";
 import { SectionHeading } from "@/components/site/SectionHeading";
-import { getSiteSettings } from "@/lib/content/queries";
+import { getProductOptions, getSiteSettings } from "@/lib/content/queries";
+import { env } from "@/lib/env";
 import { pageMetadata } from "@/lib/seo";
 
 export const revalidate = 3600;
@@ -14,7 +15,7 @@ export const metadata = pageMetadata({
 });
 
 export default async function ContactPage() {
-  const settings = await getSiteSettings();
+  const [settings, options] = await Promise.all([getSiteSettings(), getProductOptions()]);
 
   return (
     <div className="container-page py-12 sm:py-16">
@@ -55,12 +56,16 @@ export default async function ContactPage() {
         </section>
       </div>
 
-      <div className="mt-12">
-        <QuoteCta
-          heading="Request a quote"
-          text="Send your product needs, quantities and delivery location. We reply with recommendations and a quotation."
+      <section aria-labelledby="contact-quote-heading" className="mt-12">
+        <SectionHeading
+          id="contact-quote-heading"
+          title="Request a quote"
+          intro="Send your product needs, quantities and delivery location. We reply with recommendations and a quotation."
         />
-      </div>
+        <div className="mt-6">
+          <QuoteForm options={options} preselected={[]} siteKey={env.NEXT_PUBLIC_TURNSTILE_SITE_KEY} />
+        </div>
+      </section>
     </div>
   );
 }

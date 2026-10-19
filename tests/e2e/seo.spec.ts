@@ -24,6 +24,7 @@ const PAGES = [
   "/applications/roads-and-pavements",
   "/about",
   "/contact",
+  "/quote",
 ];
 
 async function metaContent(page: Page, selector: string): Promise<string | null> {
@@ -114,7 +115,7 @@ test.describe("page metadata", () => {
       const image = await metaContent(page, 'meta[property="og:image"]');
       expect(image, `${path} og:image`).toMatch(/^https?:\/\/[^/]+\/.+/);
       // Pages that never have a photo of their own use the default.
-      if (["/", "/about", "/contact", "/products", "/applications"].includes(path)) {
+      if (["/", "/about", "/contact", "/products", "/applications", "/quote"].includes(path)) {
         expect(image, `${path} og:image`).toBe(DEFAULT_IMAGE);
       }
     }
