@@ -34,6 +34,10 @@ import {
 const RUN = Date.now().toString(36);
 const CLEANUP_STEP_MS = 10_000;
 const CLEANUP_TOTAL_MS = 45_000;
+// Playwright gives all the afterEach work together one slot of max(test timeout, project timeout),
+// 30 s by default. The cleanup below can take 45 + 45 + 45 = 135 s before it gives up, so the file's
+// timeout must be larger than that or a slow failed revert never reaches the service-role fallback.
+test.describe.configure({ timeout: 180_000 });
 
 const SLUG_TAKEN = "This URL slug is already used";
 const SEED_PRODUCT = "PP Biaxial Geogrid";

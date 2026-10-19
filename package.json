@@ -15,7 +15,8 @@
     "test:e2e": "playwright test",
     "create-admin": "node --experimental-strip-types scripts/create-admin.ts",
     "db:start": "SUPABASE_INTERNAL_IMAGE_REGISTRY=docker.io supabase start",
-    "db:reset": "SUPABASE_INTERNAL_IMAGE_REGISTRY=docker.io supabase db reset"
+    "db:reset": "SUPABASE_INTERNAL_IMAGE_REGISTRY=docker.io supabase db reset",
+    "verify": "npm run lint && npm run typecheck && npm run test:unit && npm run db:reset && npm run test:db && npm run test:e2e"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

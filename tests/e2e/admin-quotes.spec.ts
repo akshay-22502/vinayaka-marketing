@@ -38,6 +38,11 @@ import {
 const RUN = Date.now().toString(36);
 const CLEANUP_STEP_MS = 10_000;
 const CLEANUP_TOTAL_MS = 45_000;
+// Playwright gives all the afterEach work together one slot of max(test timeout, project timeout),
+// 30 s by default. The cleanup below can take 10 + 10 + 45 + 10 + 45 = 120 s before it gives up, so
+// the file's timeout must be larger than that or a slow failed revert never reaches the
+// service-role fallback.
+test.describe.configure({ timeout: 150_000 });
 const PHONE_MESSAGE = "Enter a phone number with 5 to 20 digits, using digits, spaces, + - and ( ) only";
 const EMAIL_MESSAGE = "Enter a valid email address";
 const RECIPIENT_MESSAGE = "Enter one valid email address, or leave this blank to stop emails for this country";
