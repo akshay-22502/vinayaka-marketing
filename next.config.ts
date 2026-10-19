@@ -21,6 +21,15 @@ function supabaseImagePatterns(): NonNullable<NextConfig["images"]>["remotePatte
 
 const nextConfig: NextConfig = {
   images: { remotePatterns: supabaseImagePatterns() },
+  async headers() {
+    return [
+      {
+        // The admin area (login included) must never show up in search results.
+        source: "/admin/:path*",
+        headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }],
+      },
+    ];
+  },
 };
 
 export default nextConfig;

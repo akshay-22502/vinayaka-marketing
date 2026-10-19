@@ -13,6 +13,7 @@
     "test:db": "vitest run --project db",
     "pretest:e2e": "npm run db:reset && node --experimental-strip-types scripts/e2e-prepare.ts && next build",
     "test:e2e": "playwright test",
+    "create-admin": "node --experimental-strip-types scripts/create-admin.ts",
     "db:start": "SUPABASE_INTERNAL_IMAGE_REGISTRY=docker.io supabase start",
     "db:reset": "SUPABASE_INTERNAL_IMAGE_REGISTRY=docker.io supabase db reset"
   },
