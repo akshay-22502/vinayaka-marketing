@@ -4,6 +4,9 @@
   /* Brand */
   --color-navy: #253f70;
   --color-orange: #d97a3a;
+  /* Orange dark enough for small text on white (5.4:1). The brand orange is for
+     fills, rules and large text only. */
+  --color-orange-dark: #a8531a;
 
   /* Slate scale (neutral base) */
   --color-slate-50: #f8fafc;
@@ -26,4 +29,36 @@
 body {
   background: #ffffff;
   color: var(--color-slate-900);
+}
+
+/* Keyboard focus: the brand orange ring is at least 3:1 against both white and navy. */
+:focus-visible {
+  outline: 3px solid var(--color-orange);
+  outline-offset: 2px;
+}
+
+@layer components {
+  /* Page width and the 16px (mobile) / 24px / 32px side gutters. */
+  .container-page {
+    @apply mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8;
+  }
+
+  /* Buttons. Orange fills carry dark text: white on #d97a3a is only about 3:1. */
+  .btn {
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-md px-5 py-2.5 text-base font-semibold transition-colors;
+  }
+  .btn-primary {
+    @apply bg-orange text-slate-950 hover:bg-[#e48a4c];
+  }
+  .btn-secondary {
+    @apply border border-navy bg-white text-navy hover:bg-slate-100;
+  }
+  .btn-light {
+    @apply border border-white/60 text-white hover:bg-white/10;
+  }
+
+  /* Hidden until it takes keyboard focus, then drops in at the top left. */
+  .skip-link {
+    @apply absolute left-2 top-2 z-[60] -translate-y-24 rounded-md bg-white px-4 py-2 text-sm font-semibold text-navy shadow-lg focus:translate-y-0;
+  }
 }

@@ -1,16 +1,35 @@
+import { existsSync } from "node:fs";
 import { defineConfig, devices } from "@playwright/test";
 
-// Chromium comes preinstalled (PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers).
-// Do not run `playwright install`. The webServer block is added in Task 5.
+// E2E runs against a production build (`npm run test:e2e` first runs the
+// `pretest:e2e` script: db:reset, scripts/e2e-prepare.ts, next build) so that
+// caching and revalidation are real. Chromium comes preinstalled
+// (PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers); do not run `playwright install`.
+
+// scripts/e2e-prepare.ts writes the local Supabase keys and E2E flags here.
+// Loading it makes them available to test code (e.g. the service-role key) and
+// to the `next start` child process. Variables already set in the shell win.
+if (existsSync(".env.production.local")) process.loadEnvFile(".env.production.local");
+
+const PORT = 3100;
+
 export default defineConfig({
   testDir: "tests/e2e",
-  fullyParallel: true,
+  // One worker, files in order: the specs share one database.
+  fullyParallel: false,
+  workers: 1,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   reporter: "list",
   use: {
-    baseURL: process.env.E2E_BASE_URL ?? "http://localhost:3000",
+    baseURL: `http://localhost:${PORT}`,
     trace: "on-first-retry",
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  webServer: {
+    command: `npx next start -p ${PORT}`,
+    url: `http://localhost:${PORT}`,
+    reuseExistingServer: false,
+    timeout: 120_000,
+  },
 });
