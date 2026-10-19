@@ -9,6 +9,19 @@ export function requireServerEnv(name: string): string {
   return value;
 }
 
+/**
+ * True when the local/E2E-only flag ALLOW_DEV_FALLBACKS is exactly "true". Then an
+ * unset TURNSTILE_SECRET_KEY lets the captcha pass and an unset RESEND_API_KEY
+ * makes the mailer log instead of send, because a sandbox cannot reach Cloudflare
+ * or Resend. Any other value, including "1" or "TRUE", is off.
+ *
+ * As a safety net it is also off on a Vercel Production deployment, so a flag
+ * copied there by mistake cannot switch the captcha off for real visitors.
+ */
+function devFallbacksAllowed(): boolean {
+  return process.env.ALLOW_DEV_FALLBACKS === "true" && process.env.VERCEL_ENV !== "production";
+}
+
 /** True on a Vercel Preview deployment (a branch or pull request build), which must not be indexed. */
 function isVercelPreview(): boolean {
   return process.env.VERCEL_ENV === "preview";
@@ -65,6 +78,7 @@ function siteUrl(): string {
 
 export const env = {
   requireServerEnv,
+  devFallbacksAllowed,
   get NEXT_PUBLIC_SITE_URL(): string {
     return siteUrl();
   },

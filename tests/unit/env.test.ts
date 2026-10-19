@@ -119,6 +119,25 @@ describe("env.isVercelPreview", () => {
   });
 });
 
+describe("env.devFallbacksAllowed", () => {
+  it("is on only when ALLOW_DEV_FALLBACKS is exactly 'true'", () => {
+    vi.stubEnv("ALLOW_DEV_FALLBACKS", "true");
+    expect(env.devFallbacksAllowed()).toBe(true);
+    for (const value of ["", "1", "TRUE", "True", "yes", "false", " true"]) {
+      vi.stubEnv("ALLOW_DEV_FALLBACKS", value);
+      expect(env.devFallbacksAllowed()).toBe(false);
+    }
+  });
+
+  it("is off on a Vercel Production deployment even with the flag, but not on Preview", () => {
+    vi.stubEnv("ALLOW_DEV_FALLBACKS", "true");
+    vi.stubEnv("VERCEL_ENV", "production");
+    expect(env.devFallbacksAllowed()).toBe(false);
+    vi.stubEnv("VERCEL_ENV", "preview");
+    expect(env.devFallbacksAllowed()).toBe(true);
+  });
+});
+
 describe("robots.txt rules", () => {
   beforeEach(() => {
     vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://www.terratechbharat.com");
