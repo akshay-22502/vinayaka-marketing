@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ATTACHMENT_MAX_BYTES, quoteSchema, validateAttachment } from "@/lib/quote/schema";
+import { ATTACHMENT_MAX_BYTES, attachmentType, quoteSchema, validateAttachment } from "@/lib/quote/schema";
 import { fakeFile } from "../support/quote-form";
 
 const valid = {
@@ -71,6 +71,13 @@ describe("quoteSchema", () => {
     expect(quoteSchema.parse({ ...valid, products: ["a", " a ", "", "b"] }).products).toEqual(["a", "b"]);
   });
 
+  it("caps each product slug at 100 characters, dropping longer ones like unknown slugs", () => {
+    const ok = "a".repeat(100);
+    const tooLong = "b".repeat(101);
+    const result = quoteSchema.parse({ ...valid, products: [ok, tooLong, "short"] });
+    expect(result.products).toEqual([ok, "short"]);
+  });
+
   it("ignores fields it does not know, such as a recipient", () => {
     const result = quoteSchema.parse({ ...valid, to: "attacker@evil.example" });
     expect(result).not.toHaveProperty("to");
@@ -113,6 +120,29 @@ describe("validateAttachment", () => {
   it("rejects a file whose reported type contradicts its extension", () => {
     expect(validateAttachment(fakeFile("page.pdf", 100, "text/html"))).not.toBeNull();
     expect(validateAttachment(fakeFile("photo.png", 100, "application/pdf"))).not.toBeNull();
+  });
+
+  it("rejects extensions that name inherited Object properties (not own allowlist entries)", () => {
+    // ATTACHMENT_TYPES lookups must not fall through to Object.prototype.
+    const names = ["evil.constructor", "evil.__proto__", "evil.toString", "evil.hasOwnProperty", "evil.valueOf"];
+    for (const name of names) {
+      for (const type of ["application/octet-stream", "", "text/html", "application/pdf"]) {
+        expect(() => validateAttachment(fakeFile(name, 100, type))).not.toThrow();
+        expect(validateAttachment(fakeFile(name, 100, type)), `${name} as "${type}"`).toMatch(
+          /PDF, JPG, PNG or DWG/,
+        );
+      }
+    }
+  });
+
+  it("looks up the stored type only for the four allowed extensions", () => {
+    expect(attachmentType("a.PDF")?.storedAs).toBe("application/pdf");
+    expect(attachmentType("a.jpeg")?.storedAs).toBe("image/jpeg");
+    expect(attachmentType("a.png")?.storedAs).toBe("image/png");
+    expect(attachmentType("a.dwg")?.storedAs).toBe("image/vnd.dwg");
+    for (const name of ["a.exe", "a.constructor", "a.__proto__", "a", "a.", ".pdf.exe"]) {
+      expect(attachmentType(name), name).toBeUndefined();
+    }
   });
 
   it("rejects an empty file", () => {

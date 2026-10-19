@@ -260,7 +260,51 @@ describe("uploadAttachment", () => {
     expect(response.ok).toBe(false);
   });
 
+  it("refuses names whose extension is an inherited Object property, without writing anything", async () => {
+    for (const name of ["evil.constructor", "evil.__proto__", "evil.toString", "evil.exe", "noextension"]) {
+      await expect(store.uploadAttachment(fakeFile(name, 100, "application/octet-stream")), name).rejects.toThrow(
+        /not allowed/,
+      );
+    }
+  });
+
   it("throws when the file is over the bucket's 4 MB limit", async () => {
     await expect(store.uploadAttachment(fakeFile("huge.pdf", 5 * 1024 * 1024))).rejects.toThrow();
+  });
+});
+
+describe("the quote-attachments bucket", () => {
+  const bucket = () => service.storage.from("quote-attachments");
+
+  it("is private, limited to 4 MB and to the types the API stores", async () => {
+    const { data, error } = await service.storage.getBucket("quote-attachments");
+    expect(error).toBeNull();
+    expect(data).toMatchObject({ public: false, file_size_limit: 4 * 1024 * 1024 });
+    expect([...(data?.allowed_mime_types ?? [])].sort()).toEqual(
+      ["application/pdf", "image/jpeg", "image/png", "image/vnd.dwg"].sort(),
+    );
+  });
+
+  it("accepts every type the API stores", async () => {
+    for (const [file, type] of [
+      ["ok.pdf", "application/pdf"],
+      ["ok.jpg", "image/jpeg"],
+      ["ok.png", "image/png"],
+      ["ok.dwg", "image/vnd.dwg"],
+    ] as const) {
+      const path = `t8-${run}/${file}`;
+      const { error } = await bucket().upload(path, new Blob(["x"], { type }));
+      expect(error, file).toBeNull();
+      uploaded.push(path);
+    }
+  });
+
+  it("rejects other content types even when written directly with the service key", async () => {
+    for (const type of ["text/html", "application/x-msdownload", "image/svg+xml", "application/octet-stream"]) {
+      const path = `t8-${run}/bad-${type.replace(/\W/g, "-")}`;
+      const { error } = await bucket().upload(path, new Blob(["x"], { type }));
+      expect(error, type).not.toBeNull();
+      if (!error) uploaded.push(path);
+    }
   });
 });

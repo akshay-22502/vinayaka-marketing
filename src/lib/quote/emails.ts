@@ -109,47 +109,46 @@ export function renderTeamEmail(
   return { subject, html, text };
 }
 
-/** The confirmation the buyer gets. */
-export function renderBuyerEmail(q: QuoteInput, productNames: string[]): RenderedEmail {
-  const team = countryName(q.country);
-  const subject = "We received your quote request - TerraTechBharat";
+/** A short reference for the buyer to quote back: the first 8 characters of the quote id. */
+function reference(id: string): string {
+  return id.slice(0, 8);
+}
 
-  const detailRows = [
-    ["Quantity", q.quantity],
-    ["Project location", q.projectLocation],
-  ].filter((entry): entry is [string, string] => Boolean(entry[1]));
+/**
+ * The confirmation the buyer gets. It goes to an address nobody has verified, from our domain,
+ * so it carries only text we control: a generic greeting, the team name, product names from
+ * the catalogue and a short reference. Nothing the buyer typed (name, message, quantity,
+ * location) is repeated, or the form could be used to send anyone arbitrary text from us.
+ */
+export function renderBuyerEmail(q: QuoteInput, productNames: string[], id: string): RenderedEmail {
+  const team = countryName(q.country);
+  const ref = reference(id);
+  const subject = `We received your quote request (ref ${ref}) - TerraTechBharat`;
 
   const html = [
     `<div style="${STYLE.page}">`,
-    `<h1 style="${STYLE.heading}">Thank you, ${escapeHtml(q.name)}</h1>`,
+    `<h1 style="${STYLE.heading}">Hello,</h1>`,
     `<p>We have received your quote request. Our ${escapeHtml(team)} team will review it and contact you using the details you gave us.</p>`,
     productNames.length > 0
       ? `<p><strong>Products</strong></p><ul>${productNames.map((name) => `<li>${escapeHtml(name)}</li>`).join("")}</ul>`
       : "",
-    detailRows.length > 0
-      ? `<table role="presentation" cellpadding="0" cellspacing="0" style="${STYLE.table}">${detailRows
-          .map(([label, value]) => row(label, escapeHtml(value)))
-          .join("")}</table>`
-      : "",
-    `<div style="${STYLE.box}"><strong>Your message</strong><br>${multiline(q.message)}</div>`,
-    `<p style="${STYLE.note}">TerraTechBharat, geosynthetics for India and the UAE.</p>`,
+    `<p>Your reference: <strong>${escapeHtml(ref)}</strong></p>`,
+    `<p style="${STYLE.note}">TerraTechBharat, geosynthetics for India and the UAE.<br>You are receiving this because this address was entered on a quote request form on our website. If that was not you, you can ignore this email.</p>`,
     `</div>`,
   ]
     .filter(Boolean)
     .join("\n");
 
   const text = [
-    `Thank you, ${q.name}`,
+    "Hello,",
     "",
     `We have received your quote request. Our ${team} team will review it and contact you using the details you gave us.`,
     "",
     ...(productNames.length > 0 ? ["Products:", ...productNames.map((name) => `- ${name}`), ""] : []),
-    ...detailRows.map(([label, value]) => `${label}: ${value}`),
-    ...(detailRows.length > 0 ? [""] : []),
-    "Your message:",
-    q.message,
+    `Your reference: ${ref}`,
     "",
     "TerraTechBharat, geosynthetics for India and the UAE.",
+    "You are receiving this because this address was entered on a quote request form on our website. If that was not you, you can ignore this email.",
   ].join("\n");
 
   return { subject, html, text };

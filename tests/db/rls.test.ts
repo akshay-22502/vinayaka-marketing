@@ -545,13 +545,15 @@ describe("storage buckets", () => {
   const publicPath = `test/${run}/hello.txt`;
   const privatePath = `${run}/attachment.txt`;
   const body = new Blob(["hello"], { type: "text/plain" });
+  // quote-attachments only takes the types the quote API stores (see the 000004 migration).
+  const attachmentBody = new Blob(["hello"], { type: "application/pdf" });
 
   beforeAll(async () => {
-    for (const [bucket, path] of [
-      ["public-media", publicPath],
-      ["quote-attachments", privatePath],
+    for (const [bucket, path, file] of [
+      ["public-media", publicPath, body],
+      ["quote-attachments", privatePath, attachmentBody],
     ] as const) {
-      const { error } = await service.storage.from(bucket).upload(path, body);
+      const { error } = await service.storage.from(bucket).upload(path, file);
       if (error) throw new Error(`upload to ${bucket} failed: ${error.message}`);
       uploaded.push({ bucket, path });
     }
@@ -605,8 +607,12 @@ describe("storage buckets", () => {
   });
 
   it("does not let anon or members write to quote-attachments", async () => {
-    expect((await anon.storage.from("quote-attachments").upload(`${run}/anon.txt`, body)).error).not.toBeNull();
-    expect((await member.storage.from("quote-attachments").upload(`${run}/member.txt`, body)).error).not.toBeNull();
+    expect(
+      (await anon.storage.from("quote-attachments").upload(`${run}/anon.pdf`, attachmentBody)).error,
+    ).not.toBeNull();
+    expect(
+      (await member.storage.from("quote-attachments").upload(`${run}/member.pdf`, attachmentBody)).error,
+    ).not.toBeNull();
   });
 });
 

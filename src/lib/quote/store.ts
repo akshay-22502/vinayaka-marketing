@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Country } from "@/lib/content/types";
 import { slugify } from "@/lib/slug";
-import { ATTACHMENT_TYPES, attachmentExtension } from "./schema";
+import { PRODUCT_SLUG_MAX, attachmentExtension, attachmentType } from "./schema";
 
 /** A validated quote request, ready to be saved. Optional fields the buyer left blank are null. */
 export interface NewQuoteRequest {
@@ -58,7 +58,7 @@ export function createSupabaseQuoteStore(client: SupabaseClient): QuoteStore {
    * public pages apply (a product also needs its category to be published).
    */
   async function listedProducts(slugs: string[]): Promise<Array<{ slug: string; name: string }>> {
-    const wanted = [...new Set(slugs.filter((slug) => SLUG_SHAPE.test(slug)))];
+    const wanted = [...new Set(slugs.filter((slug) => slug.length <= PRODUCT_SLUG_MAX && SLUG_SHAPE.test(slug)))];
     if (wanted.length === 0) return [];
 
     const { data, error } = await client
@@ -108,8 +108,8 @@ export function createSupabaseQuoteStore(client: SupabaseClient): QuoteStore {
 
     async uploadAttachment(file) {
       const extension = attachmentExtension(file.name);
-      const type = ATTACHMENT_TYPES[extension];
-      if (!type) throw new Error(`Attachment type .${extension} is not allowed`);
+      const type = attachmentType(file.name);
+      if (!type) throw new Error(`Attachment type ".${extension}" is not allowed`);
 
       // The path is built from a month folder, a random id and a slug of the name: nothing the
       // buyer typed can add a folder or overwrite another file.

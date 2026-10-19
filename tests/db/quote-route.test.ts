@@ -140,6 +140,32 @@ describe("POST /api/quote against the local database", () => {
     expect(other.status).toBe(200);
   });
 
+  it("rejects an attachment named like an inherited Object property, with JSON 400 and nothing saved", async () => {
+    const ip = freshIp();
+    for (const [name, type] of [
+      ["evil.constructor", "application/octet-stream"],
+      ["evil.__proto__", ""],
+      ["evil.constructor", "text/html"],
+    ] as const) {
+      const response = await POST(request(quoteForm({ attachment: fakeFile(name, 100, type) }), ip));
+      expect(response.status, name).toBe(400);
+      expect((await response.json()).errors).toHaveProperty("attachment");
+    }
+    expect(await rowsFor(ip)).toHaveLength(0);
+  });
+
+  it("rate-limits an IPv6 visitor as a whole /64, so changing the host part does not help", async () => {
+    const prefix = "2001:db8:77:";
+    const ip = (n: number) => `${prefix}1:aaaa:bbbb:cccc:${n.toString(16)}`;
+    usedIps.push(ip(1), `${prefix}2::1`); // so afterAll cleans up even if an assertion fails
+    for (let i = 1; i <= 5; i++) {
+      expect((await POST(request(quoteForm(), ip(i)))).status).toBe(200);
+    }
+    expect((await POST(request(quoteForm(), ip(6)))).status).toBe(429);
+    // The next /64 is a different visitor.
+    expect((await POST(request(quoteForm(), `${prefix}2::1`))).status).toBe(200);
+  });
+
   it("rejects bad input with 400 and saves nothing", async () => {
     const ip = freshIp();
     const response = await POST(request(quoteForm({ email: "nope" }), ip));

@@ -10,6 +10,9 @@ import { getServiceClient } from "@/lib/supabase/service";
 
 export const runtime = "nodejs";
 
+const SERVER_ERROR_MESSAGE =
+  "Something went wrong on our side, so your request was not sent. Please try again in a moment, or contact us directly.";
+
 /** Room for the text fields and multipart framing on top of the largest allowed attachment. */
 const MAX_BODY_BYTES = ATTACHMENT_MAX_BYTES + 512 * 1024;
 
@@ -69,5 +72,12 @@ export async function POST(request: Request): Promise<NextResponse> {
     });
   }
 
-  return respond(await handleQuote(form, clientIp(request.headers), deps));
+  // Last line of defence: whatever escapes handleQuote still answers in JSON, so the form
+  // always gets something it can show. The details go to the log, not to the visitor.
+  try {
+    return respond(await handleQuote(form, clientIp(request.headers), deps));
+  } catch (error) {
+    console.error("[quote] unexpected error:", error instanceof Error ? (error.stack ?? error.message) : error);
+    return respond({ status: 500, body: { ok: false, message: SERVER_ERROR_MESSAGE } });
+  }
 }

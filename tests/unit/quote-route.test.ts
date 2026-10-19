@@ -122,3 +122,30 @@ describe("POST /api/quote requests", () => {
     expect(response.headers.get("cache-control")).toBe("no-store");
   });
 });
+
+describe("POST /api/quote when something unexpected throws", () => {
+  afterEach(() => {
+    vi.doUnmock("@/lib/quote/handle");
+  });
+
+  it("answers with a JSON 500 instead of an unhandled error", async () => {
+    vi.resetModules();
+    vi.doMock("@/lib/quote/handle", () => ({
+      handleQuote: async () => {
+        throw new TypeError("Cannot read properties of undefined (password=hunter2)");
+      },
+    }));
+    const { POST: guarded } = await import("@/app/api/quote/route");
+
+    const response = await guarded(request(quoteForm()));
+
+    expect(response.status).toBe(500);
+    expect(response.headers.get("content-type")).toContain("application/json");
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    const body = await response.json();
+    expect(body.ok).toBe(false);
+    expect(typeof body.message).toBe("string");
+    expect(JSON.stringify(body)).not.toContain("hunter2");
+    expect(JSON.stringify(vi.mocked(console.error).mock.calls)).toContain("hunter2");
+  });
+});

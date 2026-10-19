@@ -124,37 +124,53 @@ describe("renderTeamEmail", () => {
 });
 
 describe("renderBuyerEmail", () => {
-  it("confirms receipt, names the India team and lists the products", () => {
-    const { subject, html, text } = renderBuyerEmail(quote, names);
+  it("confirms receipt with a generic greeting, names the India team, lists the products and gives a reference", () => {
+    const { subject, html, text } = renderBuyerEmail(quote, names, id);
     expect(subject).toMatch(/received/i);
     expect(subject).not.toMatch(/[\r\n]/);
     for (const body of [html, text]) {
-      expect(body).toContain("Asha Verma");
+      expect(body).toContain("Hello,");
       expect(body).toContain("India team");
       expect(body).toContain("PP Biaxial Geogrid");
       expect(body).toContain("HDPE Geomembrane");
+      expect(body).toContain("11111111");
+      expect(body).not.toContain(id);
     }
   });
 
   it("names the UAE team for a UAE request", () => {
-    const { html, text } = renderBuyerEmail({ ...quote, country: "AE" }, names);
+    const { html, text } = renderBuyerEmail({ ...quote, country: "AE" }, names, id);
     expect(html).toContain("UAE team");
     expect(text).toContain("UAE team");
   });
 
-  it("escapes buyer text", () => {
-    const { html } = renderBuyerEmail(
-      { ...quote, name: "<script>alert(1)</script>", message: "<img src=x onerror=alert(1)>" },
-      names,
-    );
+  it("repeats nothing the buyer typed: only server-controlled text goes to an unverified address", () => {
+    const typed = {
+      ...quote,
+      name: "Zed Zorro-NAME",
+      company: "ZORRO-COMPANY Ltd",
+      phone: "+000 ZORRO-PHONE",
+      quantity: "ZORRO-QUANTITY",
+      projectLocation: "ZORRO-LOCATION",
+      message: "Click https://evil.example/ZORRO-MESSAGE to claim your prize",
+    };
+    const { subject, html, text } = renderBuyerEmail(typed, names, id);
+    for (const body of [subject, html, text]) {
+      for (const fragment of ["Zed", "Zorro", "ZORRO", "evil.example", "prize", typed.email]) {
+        expect(body, fragment).not.toContain(fragment);
+      }
+    }
+  });
+
+  it("still escapes the product names it lists", () => {
+    const { html } = renderBuyerEmail(quote, ["<script>alert(1)</script>"], id);
     expect(html).toContain("&lt;script&gt;");
     expect(html).not.toContain("<script");
-    expect(html).not.toContain("<img");
   });
 
   it("copes with no products", () => {
-    const { html, text } = renderBuyerEmail(quote, []);
-    expect(html).toContain("Asha Verma");
-    expect(text).toContain("Asha Verma");
+    const { html, text } = renderBuyerEmail(quote, [], id);
+    expect(html).toContain("India team");
+    expect(text).toContain("11111111");
   });
 });

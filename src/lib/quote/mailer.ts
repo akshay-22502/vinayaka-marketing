@@ -14,6 +14,22 @@ export interface Mailer {
 
 const DEFAULT_FROM = "TerraTechBharat <quotes@terratechbharat.com>";
 
+/** How long one send may take before it counts as failed (a hung request must not hold the buyer's response). */
+const SEND_TIMEOUT_MS = 8_000;
+
+/** Rejects if `work` has not settled within `ms`; the timer never outlives the call. */
+async function withTimeout<T>(work: PromiseLike<T>, ms: number, what: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${what} did not answer within ${ms / 1000} seconds`)), ms);
+  });
+  try {
+    return await Promise.race([work, timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /** Logs the email instead of sending it, for local runs without a Resend key. */
 const consoleMailer: Mailer = {
   async send(message) {
@@ -31,7 +47,7 @@ const consoleMailer: Mailer = {
  * throws (the route answers 500 and logs it), unless ALLOW_DEV_FALLBACKS is
  * exactly "true", where it logs the email and counts it as sent.
  *
- * `send` rejects when Resend refuses the email. (The Resend SDK returns errors
+ * `send` rejects when Resend refuses the email or does not answer within 8 seconds. (The Resend SDK returns errors
  * instead of throwing them; a rejection is what lets the caller see the failure.)
  */
 export function createMailer(): Mailer {
@@ -48,7 +64,11 @@ export function createMailer(): Mailer {
 
   return {
     async send({ to, subject, html, text, replyTo }) {
-      const { error } = await resend.emails.send({ from, to, subject, html, text, replyTo });
+      const { error } = await withTimeout(
+        resend.emails.send({ from, to, subject, html, text, replyTo }),
+        SEND_TIMEOUT_MS,
+        "Resend",
+      );
       if (error) throw new Error(`Resend could not send the email: ${error.message}`);
     },
   };

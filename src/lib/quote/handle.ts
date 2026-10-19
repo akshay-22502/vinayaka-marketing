@@ -71,15 +71,16 @@ function fail(status: 400 | 403 | 429 | 500, message: string, errors?: Record<st
   return { status, body: { ok: false, message, ...(errors ? { errors } : {}) } };
 }
 
-/** Sends one email; returns whether it went out. A failure is logged, never thrown. */
-async function trySend(
-  mailer: Mailer,
-  what: string,
-  id: string,
-  message: Parameters<Mailer["send"]>[0],
-): Promise<boolean> {
+type OutgoingEmail = Parameters<Mailer["send"]>[0];
+
+/**
+ * Builds and sends one email; returns whether it went out. Rendering happens inside the try
+ * on purpose: the request is already saved by now, so a failure anywhere in here (a template
+ * bug as much as a mail outage) is logged and never thrown.
+ */
+async function trySend(mailer: Mailer, what: string, id: string, build: () => OutgoingEmail): Promise<boolean> {
   try {
-    await mailer.send(message);
+    await mailer.send(build());
     return true;
   } catch (error) {
     console.error(`[quote ${id}] ${what} email failed:`, error instanceof Error ? error.message : error);
@@ -178,16 +179,17 @@ export async function handleQuote(form: FormData, ip: string, deps: QuoteDeps): 
 
   let teamEmailSent = false;
   if (recipient) {
-    teamEmailSent = await trySend(mailer, "team", id, {
-      to: recipient,
+    const to = recipient;
+    teamEmailSent = await trySend(mailer, "team", id, () => ({
+      to,
       replyTo: input.email,
       ...renderTeamEmail(input, productNames, id, { hasAttachment: attachmentPath !== null }),
-    });
+    }));
   } else {
     console.error(`[quote ${id}] no quote recipient is set for ${input.country}; the team was not emailed.`);
   }
 
-  await trySend(mailer, "buyer", id, { to: input.email, ...renderBuyerEmail(input, productNames) });
+  await trySend(mailer, "buyer", id, () => ({ to: input.email, ...renderBuyerEmail(input, productNames, id) }));
 
   if (teamEmailSent) {
     try {

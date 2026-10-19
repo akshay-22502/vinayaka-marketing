@@ -70,6 +70,42 @@ describe("createMailer with a Resend key", () => {
     send.mockRejectedValue(new Error("network down"));
     await expect(createMailer().send(message)).rejects.toThrow(/network down/);
   });
+
+  describe("when Resend does not answer", () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("rejects after about 8 seconds, so a hung send counts as failed", async () => {
+      send.mockReturnValue(new Promise(() => {}));
+      const outcome = createMailer()
+        .send(message)
+        .then(
+          () => "sent",
+          (error: Error) => error.message,
+        );
+
+      await vi.advanceTimersByTimeAsync(7_900);
+      expect(vi.getTimerCount()).toBe(1);
+      await vi.advanceTimersByTimeAsync(200);
+      expect(await outcome).toMatch(/8 seconds/);
+    });
+
+    it("does not leave a timer running after a quick answer", async () => {
+      send.mockResolvedValue({ data: { id: "e1" }, error: null });
+      await createMailer().send(message);
+      expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it("does not leave a timer running after an error answer", async () => {
+      send.mockResolvedValue({ data: null, error: { message: "nope", name: "validation_error" } });
+      await expect(createMailer().send(message)).rejects.toThrow(/nope/);
+      expect(vi.getTimerCount()).toBe(0);
+    });
+  });
 });
 
 describe("createMailer without a Resend key", () => {

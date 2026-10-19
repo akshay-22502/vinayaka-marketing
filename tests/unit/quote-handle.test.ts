@@ -1,10 +1,21 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import * as emails from "@/lib/quote/emails";
 import { handleQuote, type QuoteDeps } from "@/lib/quote/handle";
 import { hashIp } from "@/lib/quote/ip";
 import type { Mailer } from "@/lib/quote/mailer";
 import type { QuoteStore } from "@/lib/quote/store";
 import type { Country } from "@/lib/content/types";
 import { fakeFile, quoteForm } from "../support/quote-form";
+
+// Wraps the renderers in spies that call the real ones, so a test can make one throw.
+vi.mock("@/lib/quote/emails", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/quote/emails")>();
+  return {
+    ...actual,
+    renderTeamEmail: vi.fn(actual.renderTeamEmail),
+    renderBuyerEmail: vi.fn(actual.renderBuyerEmail),
+  };
+});
 
 const IP = "203.0.113.7";
 const SALT = "test-salt";
@@ -197,6 +208,22 @@ describe("handleQuote: validation (400)", () => {
     expect(store.insert).not.toHaveBeenCalled();
   });
 
+  it("rejects attachment names that match inherited Object properties, as 400 and never a throw", async () => {
+    const { deps, store } = setup();
+    for (const [name, type] of [
+      ["evil.constructor", "application/octet-stream"],
+      ["evil.__proto__", ""],
+      ["evil.constructor", "text/html"],
+      ["evil.toString", "application/pdf"],
+    ] as const) {
+      const result = await handleQuote(quoteForm({ attachment: fakeFile(name, 100, type) }), IP, deps);
+      expect(result.status, `${name} as "${type}"`).toBe(400);
+      expect(result.body.errors).toHaveProperty("attachment");
+    }
+    expect(store.uploadAttachment).not.toHaveBeenCalled();
+    expect(store.insert).not.toHaveBeenCalled();
+  });
+
   it("reports an attachment problem together with field problems", async () => {
     const { deps } = setup();
     const result = await handleQuote(
@@ -371,6 +398,74 @@ describe("handleQuote: insert before email, and email failures", () => {
     const result = await handleQuote(quoteForm(), IP, deps);
     expect(result.status).toBe(200);
     expect(sent(mailer)).toHaveLength(1);
+  });
+});
+
+describe("handleQuote: a failure while building an email cannot fail a saved request", () => {
+  afterEach(() => {
+    vi.mocked(emails.renderTeamEmail).mockClear();
+    vi.mocked(emails.renderBuyerEmail).mockClear();
+  });
+
+  it("returns 200 and still emails the buyer when the team email cannot be rendered", async () => {
+    vi.mocked(emails.renderTeamEmail).mockImplementationOnce(() => {
+      throw new Error("template bug");
+    });
+    const { deps, mailer, store } = setup();
+    const result = await handleQuote(quoteForm(), IP, deps);
+
+    expect(result.status).toBe(200);
+    expect(result.body).toMatchObject({ ok: true, id: QUOTE_ID });
+    expect(sent(mailer).map((m) => m.to)).toEqual(["asha@verma-infra.example"]);
+    expect(store.markEmailSent).not.toHaveBeenCalled();
+    expect(console.error).toHaveBeenCalled();
+  });
+
+  it("returns 200 and keeps email_sent for the team when the buyer email cannot be rendered", async () => {
+    vi.mocked(emails.renderBuyerEmail).mockImplementationOnce(() => {
+      throw new Error("template bug");
+    });
+    const { deps, mailer, store } = setup();
+    const result = await handleQuote(quoteForm(), IP, deps);
+
+    expect(result.status).toBe(200);
+    expect(sent(mailer).map((m) => m.to)).toEqual([RECIPIENTS.IN]);
+    expect(store.markEmailSent).toHaveBeenCalledWith(QUOTE_ID);
+  });
+
+  it("returns 200 when neither email can be rendered", async () => {
+    vi.mocked(emails.renderTeamEmail).mockImplementationOnce(() => {
+      throw new Error("template bug");
+    });
+    vi.mocked(emails.renderBuyerEmail).mockImplementationOnce(() => {
+      throw new Error("template bug");
+    });
+    const { deps, mailer, store } = setup();
+    expect((await handleQuote(quoteForm(), IP, deps)).status).toBe(200);
+    expect(mailer.send).not.toHaveBeenCalled();
+    expect(store.markEmailSent).not.toHaveBeenCalled();
+  });
+});
+
+describe("handleQuote: the buyer email carries only server-controlled text", () => {
+  it("does not repeat the buyer's name, message, quantity or location", async () => {
+    const { deps, mailer } = setup();
+    await handleQuote(
+      quoteForm({
+        name: "Zed ZORRO-NAME",
+        message: "Visit http://evil.example/ZORRO-MESSAGE now",
+        quantity: "ZORRO-QUANTITY",
+        projectLocation: "ZORRO-LOCATION",
+      }),
+      IP,
+      deps,
+    );
+    const buyer = sent(mailer)[1]!;
+    for (const body of [buyer.subject, buyer.html, buyer.text]) {
+      expect(body).not.toContain("ZORRO");
+      expect(body).not.toContain("evil.example");
+    }
+    expect(buyer.html).toContain("11111111");
   });
 });
 
