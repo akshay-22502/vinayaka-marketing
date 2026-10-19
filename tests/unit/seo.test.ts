@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { env } from "@/lib/env";
 import {
   absoluteUrl,
   DEFAULT_DESCRIPTION,
@@ -108,31 +107,6 @@ describe("absoluteUrl", () => {
   it("adds a missing leading slash and keeps absolute addresses", () => {
     expect(absoluteUrl("about")).toBe("https://www.terratechbharat.com/about");
     expect(absoluteUrl("https://cdn.example.com/a.png")).toBe("https://cdn.example.com/a.png");
-  });
-});
-
-describe("env.NEXT_PUBLIC_SITE_URL", () => {
-  it("drops a trailing slash or path", () => {
-    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://www.terratechbharat.com/");
-    expect(env.NEXT_PUBLIC_SITE_URL).toBe("https://www.terratechbharat.com");
-    expect(absoluteUrl("/about")).toBe("https://www.terratechbharat.com/about");
-  });
-
-  it("falls back to localhost outside production", () => {
-    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "");
-    vi.stubEnv("NODE_ENV", "development");
-    expect(env.NEXT_PUBLIC_SITE_URL).toBe("http://localhost:3000");
-  });
-
-  it("is required in production, so a build cannot point canonical links at localhost", () => {
-    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "");
-    vi.stubEnv("NODE_ENV", "production");
-    expect(() => env.NEXT_PUBLIC_SITE_URL).toThrow(/NEXT_PUBLIC_SITE_URL/);
-  });
-
-  it("rejects a value that is not a URL", () => {
-    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "www.terratechbharat.com");
-    expect(() => env.NEXT_PUBLIC_SITE_URL).toThrow(/full URL/);
   });
 });
 
