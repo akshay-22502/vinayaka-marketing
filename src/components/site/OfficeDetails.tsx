@@ -4,6 +4,8 @@ type Props = {
   /** Heading, e.g. "India office". */
   title: string;
   headingLevel?: 2 | 3;
+  /** Id for the heading, so a surrounding `<section aria-labelledby>` can name itself after it. */
+  headingId?: string;
   address: string;
   phone: string;
   whatsapp: string;
@@ -45,6 +47,7 @@ function Row({
 export function OfficeDetails({
   title,
   headingLevel = 3,
+  headingId,
   address,
   phone,
   whatsapp,
@@ -59,7 +62,9 @@ export function OfficeDetails({
 
   return (
     <div className={dark ? "text-white/80" : "text-slate-700"}>
-      <Heading className={`text-lg font-semibold ${dark ? "text-white" : "text-navy"}`}>{title}</Heading>
+      <Heading id={headingId} className={`text-lg font-semibold ${dark ? "text-white" : "text-navy"}`}>
+        {title}
+      </Heading>
       {address.trim() !== "" ? <p className="mt-2 whitespace-pre-line break-words">{address}</p> : null}
       <dl className="mt-3 space-y-1 text-sm">
         <Row label="Phone" value={phone} href={telHref(phone)} linkClass={linkClass} />

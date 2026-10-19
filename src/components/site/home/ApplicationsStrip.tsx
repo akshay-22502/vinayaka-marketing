@@ -1,7 +1,6 @@
 import Link from "next/link";
 import type { Application } from "@/lib/content/types";
-import { APPLICATION_PLACEHOLDER, mediaOr } from "@/lib/media";
-import { CoverImage } from "../CoverImage";
+import { ApplicationCard } from "../ApplicationCard";
 import { SectionHeading } from "../SectionHeading";
 
 const SHOWN = 6;
@@ -21,26 +20,7 @@ export function ApplicationsStrip({ applications }: { applications: Application[
         <ul className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {applications.slice(0, SHOWN).map((application) => (
             <li key={application.slug}>
-              <article className="group relative flex h-full flex-col overflow-hidden rounded-xl border border-slate-200 bg-white transition-shadow hover:shadow-md has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-orange">
-                <div className="relative aspect-[16/9] bg-slate-100">
-                  <CoverImage
-                    src={mediaOr(application.imagePath, APPLICATION_PLACEHOLDER)}
-                    alt=""
-                    sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
-                  />
-                </div>
-                <div className="p-5">
-                  <h3 className="text-lg font-semibold text-navy">
-                    <Link
-                      href={`/applications/${application.slug}`}
-                      className="after:absolute after:inset-0"
-                    >
-                      {application.name}
-                    </Link>
-                  </h3>
-                  <p className="mt-2 line-clamp-2 text-slate-600">{application.summary}</p>
-                </div>
-              </article>
+              <ApplicationCard application={application} />
             </li>
           ))}
         </ul>

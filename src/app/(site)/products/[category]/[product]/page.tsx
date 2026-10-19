@@ -77,13 +77,17 @@ export default async function ProductPage({ params }: Props) {
         ) : null}
       </div>
 
-      <div className="mt-8 grid gap-8 lg:grid-cols-2 lg:gap-12">
-        <ProductGallery
-          productName={product.name}
-          images={images}
-          placeholder={categoryPlaceholder(product.categorySlug)}
-        />
-        <div>
+      {/* grid-cols-1 is minmax(0, 1fr), and min-w-0 lets each item shrink below its content,
+          so a long unbroken URL in the Markdown wraps instead of widening the page. */}
+      <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-2 lg:gap-12">
+        <div className="min-w-0">
+          <ProductGallery
+            productName={product.name}
+            images={images}
+            placeholder={categoryPlaceholder(product.categorySlug)}
+          />
+        </div>
+        <div className="min-w-0">
           <section aria-labelledby="overview-heading">
             <h2 id="overview-heading" className="text-2xl font-bold tracking-tight text-navy">
               Overview
