@@ -1,6 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { supabasePublicConfig } from "@/lib/supabase/config";
+import { supabaseCookieOptions, supabasePublicConfig } from "@/lib/supabase/config";
 
 /**
  * Keeps the admin's Supabase session fresh. The access token lasts an hour; on a
@@ -17,6 +17,7 @@ export async function middleware(request: NextRequest) {
   const { url, anonKey } = supabasePublicConfig();
 
   const supabase = createServerClient(url, anonKey, {
+    cookieOptions: supabaseCookieOptions(),
     cookies: {
       getAll() {
         return request.cookies.getAll();

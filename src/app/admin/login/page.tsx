@@ -2,12 +2,10 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import { redirect } from "next/navigation";
 import { LoginForm } from "@/components/admin/LoginForm";
-import { isAdmin } from "@/lib/admin/require-admin";
+import { resolveLoginState } from "@/lib/admin/login-state";
 import { getServerClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Sign in" };
-
-const NOT_ADMIN_MESSAGE = "This account does not have admin access";
 
 export default async function LoginPage({
   searchParams,
@@ -16,12 +14,9 @@ export default async function LoginPage({
 }) {
   // This page needs no session, but an admin who is already signed in has no use for it.
   const supabase = await getServerClient();
-  const { data } = await supabase.auth.getUser();
-  if (data.user && (await isAdmin(supabase))) redirect("/admin");
-
-  // Only the one known reason is shown; the query string is never echoed back.
   const { error } = await searchParams;
-  const initialError = error === "not-admin" ? NOT_ADMIN_MESSAGE : undefined;
+  const state = await resolveLoginState(supabase, error);
+  if (state.redirectTo) redirect(state.redirectTo);
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-50">
@@ -37,7 +32,7 @@ export default async function LoginPage({
           <h1 className="text-2xl font-bold tracking-tight text-navy">Sign in</h1>
           <p className="mt-1 text-sm text-slate-600">For the TerraTechBharat team only.</p>
           <div className="mt-6">
-            <LoginForm initialError={initialError} />
+            <LoginForm initialError={state.error} />
           </div>
         </div>
       </main>

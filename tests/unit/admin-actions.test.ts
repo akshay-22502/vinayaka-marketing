@@ -18,8 +18,13 @@ const { signIn, signOut } = await import("@/app/admin/actions");
 
 type AuthFailure = { name: string; status?: number; message: string };
 
-function fakeSupabase(options: { signInError?: AuthFailure; user?: { id: string }; isAdmin?: boolean }) {
-  const { signInError, user = { id: "user-1" }, isAdmin = true } = options;
+function fakeSupabase(options: {
+  signInError?: AuthFailure;
+  user?: { id: string };
+  isAdmin?: boolean;
+  rpcError?: { message: string };
+}) {
+  const { signInError, user = { id: "user-1" }, isAdmin = true, rpcError } = options;
   const supabase = {
     auth: {
       signInWithPassword: vi.fn(async () =>
@@ -27,7 +32,7 @@ function fakeSupabase(options: { signInError?: AuthFailure; user?: { id: string 
       ),
       signOut: vi.fn(async () => ({ error: null })),
     },
-    rpc: vi.fn(async () => ({ data: isAdmin, error: null })),
+    rpc: vi.fn(async () => ({ data: rpcError ? null : isAdmin, error: rpcError ?? null })),
   };
   getServerClient.mockResolvedValue(supabase);
   return supabase;
@@ -66,6 +71,18 @@ describe("signIn", () => {
       "REDIRECT /admin/login?error=not-admin",
     );
     expect(supabase.auth.signOut).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows the form with a generic error, and leaves no session, when the admin check fails", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    const supabase = fakeSupabase({ rpcError: { message: "connection refused" } });
+
+    await expect(signIn(null, form({ email: "owner@example.com", password: "secret-password" }))).resolves.toEqual({
+      error: "We could not check your account just now. Please try signing in again.",
+    });
+    expect(supabase.auth.signOut).toHaveBeenCalledTimes(1);
+    expect(log).toHaveBeenCalled();
+    log.mockRestore();
   });
 
   it("gives one message for every credential problem, whatever Supabase says", async () => {

@@ -10,5 +10,8 @@ import { supabasePublicConfig } from "./config";
  */
 export function getBrowserClient(): SupabaseClient {
   const { url, anonKey } = supabasePublicConfig();
-  return createBrowserClient(url, anonKey);
+  // The browser refreshes the session cookie too, so it must write it with the same Secure
+  // setting as the server does (the server marks it Secure on https sites).
+  const secure = typeof window !== "undefined" && window.location.protocol === "https:";
+  return createBrowserClient(url, anonKey, { cookieOptions: { secure } });
 }

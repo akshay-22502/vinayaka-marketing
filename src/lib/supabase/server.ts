@@ -2,7 +2,7 @@ import "server-only";
 import { createServerClient } from "@supabase/ssr";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
-import { supabasePublicConfig } from "./config";
+import { supabaseCookieOptions, supabasePublicConfig } from "./config";
 
 /**
  * Supabase client for a signed-in user, for Server Components, Server Actions and
@@ -23,6 +23,7 @@ export async function getServerClient(): Promise<SupabaseClient> {
   const { url, anonKey } = supabasePublicConfig();
 
   return createServerClient(url, anonKey, {
+    cookieOptions: supabaseCookieOptions(),
     cookies: {
       getAll() {
         return cookieStore.getAll();

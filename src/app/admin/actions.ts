@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { CHECK_FAILED_MESSAGE } from "@/lib/admin/login-state";
 import { isAdmin, LOGIN_PATH, NOT_ADMIN_PATH } from "@/lib/admin/require-admin";
 import { getServerClient } from "@/lib/supabase/server";
 
@@ -34,7 +35,18 @@ export async function signIn(_previous: SignInState, formData: FormData): Promis
     return { error: WRONG_CREDENTIALS };
   }
 
-  if (!(await isAdmin(supabase))) {
+  let admin: boolean;
+  try {
+    admin = await isAdmin(supabase);
+  } catch (checkError) {
+    // The password was right but we cannot tell whether this is an admin. Do not leave a session
+    // behind; let the person try again from the form, not from an error page.
+    console.error("Could not check admin access after sign-in", checkError);
+    await supabase.auth.signOut().catch(() => undefined);
+    return { error: CHECK_FAILED_MESSAGE };
+  }
+
+  if (!admin) {
     await supabase.auth.signOut();
     redirect(NOT_ADMIN_PATH);
   }
