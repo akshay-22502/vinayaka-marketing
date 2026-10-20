@@ -9,6 +9,7 @@ import { signOut } from "@/app/admin/actions";
 const SECTIONS = [
   { label: "Dashboard", href: "/admin" },
   { label: "Quotes", href: "/admin/quotes" },
+  { label: "Buyers", href: "/admin/buyers" },
   { label: "Products", href: "/admin/products" },
   { label: "Categories", href: "/admin/categories" },
   { label: "Applications", href: "/admin/applications" },
