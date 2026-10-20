@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Application } from "@/lib/content/types";
-import { APPLICATION_PLACEHOLDER, mediaOr } from "@/lib/media";
+import { applicationPlaceholder, mediaOr } from "@/lib/media";
 import { CoverImage } from "./CoverImage";
 
 type Props = {
@@ -9,7 +9,7 @@ type Props = {
   headingLevel?: 2 | 3;
 };
 
-/** An application in a listing: photo (or placeholder), name and summary. The whole card is one link. */
+/** An application in a listing: photo (or its default drawing), name and summary. The whole card is one link. */
 export function ApplicationCard({ application, headingLevel = 3 }: Props) {
   const Heading = headingLevel === 2 ? "h2" : "h3";
 
@@ -17,7 +17,7 @@ export function ApplicationCard({ application, headingLevel = 3 }: Props) {
     <article className="group relative flex h-full flex-col overflow-hidden rounded-xl border border-slate-200 bg-white transition-shadow hover:shadow-md has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-orange">
       <div className="relative aspect-[16/9] bg-slate-100">
         <CoverImage
-          src={mediaOr(application.imagePath, APPLICATION_PLACEHOLDER)}
+          src={mediaOr(application.imagePath, applicationPlaceholder(application.slug))}
           alt=""
           sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
         />

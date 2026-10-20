@@ -8,7 +8,7 @@ import { ProductCard } from "@/components/site/ProductCard";
 import { QuoteCta } from "@/components/site/QuoteCta";
 import { SectionHeading } from "@/components/site/SectionHeading";
 import { getApplication, getApplications } from "@/lib/content/queries";
-import { APPLICATION_PLACEHOLDER } from "@/lib/media";
+import { applicationPlaceholder } from "@/lib/media";
 import { metaDescription, pageMetadata } from "@/lib/seo";
 import { publicMediaUrl } from "@/lib/storage";
 
@@ -60,7 +60,7 @@ export default async function ApplicationPage({ params }: Props) {
 
       <div className="relative mt-8 aspect-[16/9] overflow-hidden rounded-xl border border-slate-200 bg-slate-100 lg:aspect-[21/9]">
         <CoverImage
-          src={photo ?? APPLICATION_PLACEHOLDER}
+          src={photo ?? applicationPlaceholder(application.slug)}
           alt={photo ? application.name : ""}
           sizes="(min-width: 1152px) 1088px, 100vw"
           priority

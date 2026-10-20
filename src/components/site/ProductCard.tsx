@@ -1,12 +1,12 @@
 import Link from "next/link";
 import type { ProductSummary } from "@/lib/content/types";
-import { categoryPlaceholder, mediaOr } from "@/lib/media";
+import { mediaOr, productPlaceholder } from "@/lib/media";
 import { CoverImage } from "./CoverImage";
 
-/** A product in a listing: photo (or the category placeholder), name and summary. The whole card is one link. */
+/** A product in a listing: photo (or its default render), name and summary. The whole card is one link. */
 export function ProductCard({ product }: { product: ProductSummary }) {
   const href = `/products/${product.categorySlug}/${product.slug}`;
-  const src = mediaOr(product.coverImage, categoryPlaceholder(product.categorySlug));
+  const src = mediaOr(product.coverImage, productPlaceholder(product.slug, product.categorySlug));
 
   return (
     <article className="group relative flex h-full flex-col overflow-hidden rounded-xl border border-slate-200 bg-white transition-shadow hover:shadow-md has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-orange">

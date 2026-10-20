@@ -14,7 +14,7 @@ type Props = {
 /**
  * Product photos: one large image and, when there are several, a row of
  * thumbnail buttons to switch between them. With no photos it shows the
- * category placeholder.
+ * product's default render.
  */
 export function ProductGallery({ productName, images, placeholder }: Props) {
   const [selected, setSelected] = useState(0);

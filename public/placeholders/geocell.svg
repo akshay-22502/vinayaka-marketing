@@ -1,7 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" role="img" aria-label="Geocell placeholder">
-<rect width="800" height="600" fill="#253F70"/>
-<defs><path id="h" d="M0 -56L48.5 -28V28L0 56L-48.5 28V-28Z"/></defs>
-<g fill="none" stroke="#D97A3A" stroke-width="8" stroke-linejoin="round">
-<use href="#h" x="206" y="130"/><use href="#h" x="303" y="130"/><use href="#h" x="400" y="130"/><use href="#h" x="497" y="130"/><use href="#h" x="594" y="130"/><use href="#h" x="255" y="214"/><use href="#h" x="352" y="214"/><use href="#h" x="448" y="214"/><use href="#h" x="545" y="214"/><use href="#h" x="206" y="298"/><use href="#h" x="303" y="298"/><use href="#h" x="400" y="298"/><use href="#h" x="497" y="298"/><use href="#h" x="594" y="298"/><use href="#h" x="255" y="382"/><use href="#h" x="352" y="382"/><use href="#h" x="448" y="382"/><use href="#h" x="545" y="382"/><use href="#h" x="206" y="466"/><use href="#h" x="303" y="466"/><use href="#h" x="400" y="466"/><use href="#h" x="497" y="466"/><use href="#h" x="594" y="466"/>
-</g>
-</svg>

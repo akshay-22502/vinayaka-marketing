@@ -13,7 +13,7 @@ import {
   getCategoryWithProducts,
   getProduct,
 } from "@/lib/content/queries";
-import { categoryPlaceholder } from "@/lib/media";
+import { productPlaceholder } from "@/lib/media";
 import { metaDescription, pageMetadata } from "@/lib/seo";
 import { publicMediaUrl } from "@/lib/storage";
 
@@ -92,7 +92,7 @@ export default async function ProductPage({ params }: Props) {
           <ProductGallery
             productName={product.name}
             images={images}
-            placeholder={categoryPlaceholder(product.categorySlug)}
+            placeholder={productPlaceholder(product.slug, product.categorySlug)}
           />
         </div>
         <div className="min-w-0">

@@ -48,8 +48,8 @@ test.describe("applications", () => {
     }
     // The summary is on the card.
     await expect(main).toContainText("Separation and reinforcement layers");
-    // Seed applications have no photo, so the card shows the placeholder drawing.
-    await expect(main.locator('img[src="/placeholders/application.svg"]').first()).toBeVisible();
+    // Seed applications have no photo, so each card shows its default cross-section drawing.
+    await expect(main.locator('img[src*="railways.webp"]')).toBeVisible();
   });
 
   test("an application lists the products it uses", async ({ page }) => {
@@ -78,8 +78,8 @@ test.describe("applications", () => {
     await expect(used.getByRole("link", { name: "HDPE Geomembrane" })).toHaveCount(0);
     await expect(used.getByRole("link", { name: "LLDPE Geomembrane" })).toHaveCount(0);
 
-    // Hero image: the placeholder, because the seed application has no photo.
-    await expect(main.locator('img[src="/placeholders/application.svg"]').first()).toBeVisible();
+    // Hero image: the default cross-section drawing, because the seed application has no photo.
+    await expect(main.locator('img[src*="roads-and-pavements.webp"]')).toBeVisible();
 
     await expect(main.getByRole("link", { name: "Request a quote" })).toHaveAttribute("href", "/quote");
   });
