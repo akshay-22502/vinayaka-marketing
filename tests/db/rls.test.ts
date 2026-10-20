@@ -487,6 +487,65 @@ describe("save_spec_table", () => {
   });
 });
 
+describe("wholesale buyers", () => {
+  let buyerId: string;
+
+  beforeAll(async () => {
+    buyerId = await insert("wholesale_buyers", { company: `Buyer ${run}`, country: "AE" });
+  });
+
+  it("are hidden from visitors and signed-in non-admins, who cannot write them either", async () => {
+    for (const client of [anon, member]) {
+      for (const table of ["wholesale_buyers", "wholesale_buyer_notes"]) {
+        const { data } = await client.from(table).select("*");
+        expect(data ?? [], table).toHaveLength(0);
+      }
+      const insertBuyer = await client.from("wholesale_buyers").insert({ company: "x", country: "IN" });
+      expect(insertBuyer.error).not.toBeNull();
+      const insertNote = await client.from("wholesale_buyer_notes").insert({ buyer_id: buyerId, body: "x" });
+      expect(insertNote.error).not.toBeNull();
+      const update = await client.from("wholesale_buyers").update({ status: "onboarded" }).eq("id", buyerId).select();
+      expect(update.data ?? []).toHaveLength(0);
+    }
+    const { data } = await service.from("wholesale_buyers").select("status").eq("id", buyerId).single();
+    expect(data?.status).toBe("not_contacted");
+  });
+
+  it("an admin can add, read and delete notes, and a note with a status moves the buyer to it", async () => {
+    const plain = await admin.from("wholesale_buyer_notes").insert({ buyer_id: buyerId, body: "Called" }).select("id, status").single();
+    expect(plain.error).toBeNull();
+    expect(plain.data?.status).toBeNull();
+    let buyer = await admin.from("wholesale_buyers").select("status").eq("id", buyerId).single();
+    expect(buyer.data?.status).toBe("not_contacted");
+
+    const moved = await admin.from("wholesale_buyer_notes").insert({ buyer_id: buyerId, status: "in_discussion" }).select("id").single();
+    expect(moved.error).toBeNull();
+    buyer = await admin.from("wholesale_buyers").select("status").eq("id", buyerId).single();
+    expect(buyer.data?.status).toBe("in_discussion");
+
+    const notes = await admin.from("wholesale_buyer_notes").select("id").eq("buyer_id", buyerId);
+    expect(notes.data).toHaveLength(2);
+    const removed = await admin.from("wholesale_buyer_notes").delete().eq("id", plain.data!.id).select("id");
+    expect(removed.data).toHaveLength(1);
+  });
+
+  it("refuses unknown statuses, countries and empty notes", async () => {
+    expect((await service.from("wholesale_buyers").insert({ company: "x", country: "US" })).error?.code).toBe("23514");
+    expect((await service.from("wholesale_buyers").insert({ company: "x", country: "IN", status: "won" })).error?.code).toBe("23514");
+    expect((await service.from("wholesale_buyers").insert({ company: "x", country: "IN", priority: "urgent" })).error?.code).toBe("23514");
+    expect((await service.from("wholesale_buyer_notes").insert({ buyer_id: buyerId, body: "" })).error?.code).toBe("23514");
+  });
+
+  it("deleting a buyer deletes its notes", async () => {
+    const id = await insert("wholesale_buyers", { company: `Gone ${run}`, country: "IN" });
+    await service.from("wholesale_buyer_notes").insert({ buyer_id: id, body: "x" });
+    const removed = await admin.from("wholesale_buyers").delete().eq("id", id).select("id");
+    expect(removed.data).toHaveLength(1);
+    const { data } = await service.from("wholesale_buyer_notes").select("id").eq("buyer_id", id);
+    expect(data).toEqual([]);
+  });
+});
+
 describe("database guards", () => {
   const publicTables = `
     select c.relname as tablename, c.relrowsecurity as rowsecurity, c.oid
@@ -500,6 +559,7 @@ describe("database guards", () => {
         "admins", "applications", "categories", "certifications", "product_applications",
         "products", "project_products", "projects", "quote_recipients", "quote_requests",
         "site_settings", "spec_models", "spec_properties", "spec_values",
+        "wholesale_buyer_notes", "wholesale_buyers",
       ],
     );
     expect(rows.filter((row) => !row.rowsecurity).map((row) => row.tablename)).toEqual([]);
@@ -518,7 +578,7 @@ describe("database guards", () => {
   it("gives anon no access at all to private tables", async () => {
     const { rows } = await db.query<{ tablename: string }>(
       `select t.tablename from (${publicTables}) t
-       where t.tablename in ('quote_requests', 'quote_recipients', 'admins')
+       where t.tablename in ('quote_requests', 'quote_recipients', 'admins', 'wholesale_buyers', 'wholesale_buyer_notes')
          and has_table_privilege('anon', t.oid, 'select')`,
     );
     expect(rows).toEqual([]);
@@ -532,6 +592,8 @@ describe("database guards", () => {
     expect(await check("authenticated", "public.save_spec_table(uuid, jsonb)")).toBe(true);
     expect(await check("anon", "public.set_updated_at()")).toBe(false);
     expect(await check("authenticated", "public.set_updated_at()")).toBe(false);
+    expect(await check("anon", "public.apply_buyer_note_status()")).toBe(false);
+    expect(await check("authenticated", "public.apply_buyer_note_status()")).toBe(false);
   });
 
   it("keeps a newly created function in public away from anon and signed-in users until it is granted", async () => {
