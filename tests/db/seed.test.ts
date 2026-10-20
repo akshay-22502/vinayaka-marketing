@@ -1,6 +1,13 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { beforeAll, describe, expect, it } from "vitest";
+import {
+  APPLICATION_PLACEHOLDER,
+  HERO_IMAGE,
+  applicationPlaceholder,
+  categoryPlaceholder,
+  productPlaceholder,
+} from "@/lib/media";
 import { anonClient, serviceClient } from "./helpers";
 
 // Checks the starter catalogue loaded by supabase/seed.sql (run by `npm run db:reset`).
@@ -397,20 +404,32 @@ describe("seeded copy", () => {
   });
 });
 
-describe("placeholder images", () => {
-  const dir = fileURLToPath(new URL("../../public/placeholders/", import.meta.url));
+describe("default images", () => {
+  const publicDir = fileURLToPath(new URL("../../public", import.meta.url));
 
-  it.each(["geogrid", "geomembrane", "geotextile", "geocell", "application"])(
-    "has a small navy and orange %s.svg",
-    (name) => {
-      const file = `${dir}${name}.svg`;
-      expect(existsSync(file), file).toBe(true);
-      expect(statSync(file).size, `${name}.svg size`).toBeLessThan(3 * 1024);
-      const svg = readFileSync(file, "utf8");
-      expect(svg.trimStart().startsWith("<svg")).toBe(true);
-      expect(svg).toContain("#253F70");
-      expect(svg).toContain("#D97A3A");
-      expect(svg).not.toMatch(/<script|<image|href="https?:|onload=/i);
-    },
-  );
+  it("has a small navy and orange application.svg for projects and entries added later", () => {
+    const file = `${publicDir}${APPLICATION_PLACEHOLDER}`;
+    expect(existsSync(file), file).toBe(true);
+    expect(statSync(file).size, "application.svg size").toBeLessThan(3 * 1024);
+    const svg = readFileSync(file, "utf8");
+    expect(svg.trimStart().startsWith("<svg")).toBe(true);
+    expect(svg).toContain("#253F70");
+    expect(svg).toContain("#D97A3A");
+    expect(svg).not.toMatch(/<script|<image|href="https?:|onload=/i);
+  });
+
+  // Every starter category, product and application has its own render, so none falls back to the drawing.
+  it.each([
+    ...categorySlugs.map((slug) => [`category ${slug}`, categoryPlaceholder(slug)]),
+    ...productSlugs.map((slug) => [`product ${slug}`, productPlaceholder(slug, expected[slug]!.category)]),
+    ...applicationSlugs.map((slug) => [`application ${slug}`, applicationPlaceholder(slug)]),
+    ["home banner", HERO_IMAGE],
+  ])("has a webp render for the %s", (_, url) => {
+    expect(url).toMatch(/^\/images\/[a-z-]+(\/[a-z-]+)?\.webp$/);
+    const file = `${publicDir}${url}`;
+    expect(existsSync(file), file).toBe(true);
+    expect(statSync(file).size, `${url} size`).toBeLessThan(200 * 1024);
+    const head = readFileSync(file).subarray(0, 12);
+    expect(head.toString("ascii", 0, 4) + head.toString("ascii", 8, 12)).toBe("RIFFWEBP");
+  });
 });

@@ -72,8 +72,8 @@ test.describe("catalogue", () => {
     }
     expect([...tops].sort((a, b) => a - b)).toEqual(tops);
 
-    // Placeholder gallery image, because the seed product has no photos.
-    await expect(page.locator('img[src="/placeholders/geogrid.svg"]').first()).toBeVisible();
+    // The product's default render, because the seed product has no photos. Webp goes through the optimizer.
+    await expect(page.locator('img[src*="pp-biaxial-geogrid.webp"]').first()).toBeVisible();
 
     // Application chips link to the application pages.
     await expect(

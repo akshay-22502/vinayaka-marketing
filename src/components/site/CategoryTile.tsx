@@ -9,7 +9,7 @@ type Props = {
   headingLevel?: 2 | 3;
 };
 
-/** A product line: photo (or placeholder), name and intro. The whole tile is one link. */
+/** A product line: photo (or its default render), name and intro. The whole tile is one link. */
 export function CategoryTile({ category, headingLevel = 3 }: Props) {
   const Heading = headingLevel === 2 ? "h2" : "h3";
   const src = mediaOr(category.imagePath, categoryPlaceholder(category.slug));
