@@ -21,7 +21,7 @@ type Props = {
   rows?: number;
   maxLength?: number;
   options?: Option[];
-  inputMode?: "numeric" | "text" | "email" | "tel";
+  inputMode?: "numeric" | "decimal" | "text" | "email" | "tel";
   placeholder?: string;
   spellCheck?: boolean;
 };
