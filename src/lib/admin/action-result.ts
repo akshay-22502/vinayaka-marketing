@@ -16,6 +16,8 @@ export const SLUG_TAKEN_MESSAGE = "This URL slug is already used";
 export const CATEGORY_HAS_PRODUCTS_MESSAGE = "This category still has products. Move or delete them first.";
 export const NOT_FOUND_MESSAGE = "This item no longer exists. It may have been deleted in another window.";
 export const CATEGORY_GONE_MESSAGE = "This category no longer exists. Choose another one.";
+export const SUPPLIER_HAS_PURCHASES_MESSAGE = "This supplier has purchases. Delete those purchases first.";
+export const SUPPLIER_GONE_MESSAGE = "This supplier no longer exists. Choose another one.";
 const NOT_ALLOWED_MESSAGE = "You do not have permission to do that. Sign in again with an admin account.";
 const INVALID_VALUES_MESSAGE =
   "Some values are not valid. Check the model codes, property names and values, then save again.";
@@ -47,7 +49,7 @@ function isSlugViolation(error: PgErrorLike): boolean {
  *  - unique violation on a slug: "This URL slug is already used" on the slug field (never a 500);
  *  - deleting a category that still has products (`products.category_id` is ON DELETE RESTRICT):
  *    a friendly message for the form; saving a product into a category that was deleted in the
- *    meantime: a message on the category field;
+ *    meantime: a message on the category field; the same for a supplier that still has purchases;
  *  - the spec table RPC's own errors: product not found (P0002), not an admin (42501), rejected
  *    input (22023);
  *  - anything else: a generic message. The database text is never shown to the admin.
@@ -67,6 +69,12 @@ export function fromPgError(error: unknown): ActionFailure {
       return /insert or update on table "products"/.test(detail)
         ? failure({ category_id: CATEGORY_GONE_MESSAGE })
         : failure({ [FORM_ERROR]: CATEGORY_HAS_PRODUCTS_MESSAGE });
+    }
+    if (/purchases_supplier_id/.test(detail)) {
+      // The same for a purchase and its supplier (`purchases.supplier_id` is ON DELETE RESTRICT).
+      return /insert or update on table "purchases"/.test(detail)
+        ? failure({ supplier_id: SUPPLIER_GONE_MESSAGE })
+        : failure({ [FORM_ERROR]: SUPPLIER_HAS_PURCHASES_MESSAGE });
     }
     return failure({ [FORM_ERROR]: LINKED_MESSAGE });
   }

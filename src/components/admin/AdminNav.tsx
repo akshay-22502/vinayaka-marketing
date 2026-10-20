@@ -10,6 +10,8 @@ const SECTIONS = [
   { label: "Dashboard", href: "/admin" },
   { label: "Quotes", href: "/admin/quotes" },
   { label: "Buyers", href: "/admin/buyers" },
+  { label: "Suppliers", href: "/admin/suppliers" },
+  { label: "Purchases", href: "/admin/purchases" },
   { label: "Products", href: "/admin/products" },
   { label: "Categories", href: "/admin/categories" },
   { label: "Applications", href: "/admin/applications" },

@@ -546,6 +546,84 @@ describe("wholesale buyers", () => {
   });
 });
 
+describe("suppliers and purchases", () => {
+  const tables = ["suppliers", "purchases", "purchase_items", "purchase_costs"];
+  let supplierId: string;
+  let purchaseId: string;
+
+  beforeAll(async () => {
+    supplierId = await insert("suppliers", { name: `Supplier ${run}` });
+    purchaseId = await insert("purchases", { supplier_id: supplierId, destination: "IN", exchange_rate: 83.5 });
+    await service.from("purchase_items").insert({ purchase_id: purchaseId, product_id: publishedProduct, rolls: 10, sqm_per_roll: 350, unit_price: 0.5 });
+    await service.from("purchase_costs").insert({ purchase_id: purchaseId, kind: "freight", amount: 1000 });
+  });
+
+  it("are hidden from visitors and signed-in non-admins, who cannot write them either", async () => {
+    for (const client of [anon, member]) {
+      for (const table of tables) {
+        const { data } = await client.from(table).select("*");
+        expect(data ?? [], table).toHaveLength(0);
+      }
+      expect((await client.from("suppliers").insert({ name: "x" })).error).not.toBeNull();
+      expect((await client.from("purchases").insert({ supplier_id: supplierId, destination: "IN", exchange_rate: 1 })).error).not.toBeNull();
+      expect((await client.from("purchase_items").insert({ purchase_id: purchaseId, rolls: 1, sqm_per_roll: 1, unit_price: 1 })).error).not.toBeNull();
+      expect((await client.from("purchase_costs").insert({ purchase_id: purchaseId, kind: "other", amount: 1 })).error).not.toBeNull();
+      const update = await client.from("purchases").update({ exchange_rate: 1 }).eq("id", purchaseId).select();
+      expect(update.data ?? []).toHaveLength(0);
+    }
+    const { data } = await service.from("purchases").select("exchange_rate").eq("id", purchaseId).single();
+    expect(Number(data?.exchange_rate)).toBe(83.5);
+  });
+
+  it("an admin can read and write them all", async () => {
+    for (const table of tables) {
+      const { data, error } = await admin.from(table).select("id");
+      expect(error, table).toBeNull();
+      expect((data ?? []).length, table).toBeGreaterThan(0);
+    }
+    const cost = await admin.from("purchase_costs").insert({ purchase_id: purchaseId, kind: "customs_duty", amount: 25000 }).select("id").single();
+    expect(cost.error).toBeNull();
+    const removed = await admin.from("purchase_costs").delete().eq("id", cost.data!.id).select("id");
+    expect(removed.data).toHaveLength(1);
+  });
+
+  it("refuses unknown values and impossible numbers", async () => {
+    const bad = async (table: string, row: Record<string, unknown>) => (await service.from(table).insert(row)).error?.code;
+    expect(await bad("suppliers", { name: "" })).toBe("23514");
+    expect(await bad("purchases", { supplier_id: supplierId, destination: "US", exchange_rate: 1 })).toBe("23514");
+    expect(await bad("purchases", { supplier_id: supplierId, destination: "IN", exchange_rate: 0 })).toBe("23514");
+    expect(await bad("purchases", { supplier_id: supplierId, destination: "IN", exchange_rate: 1, currency: "EUR" })).toBe("23514");
+    expect(await bad("purchases", { supplier_id: supplierId, destination: "IN", exchange_rate: 1, status: "lost" })).toBe("23514");
+    expect(await bad("purchase_items", { purchase_id: purchaseId, rolls: 0, sqm_per_roll: 1, unit_price: 1 })).toBe("23514");
+    expect(await bad("purchase_items", { purchase_id: purchaseId, rolls: 1, sqm_per_roll: 1, unit_price: -1 })).toBe("23514");
+    expect(await bad("purchase_items", { purchase_id: purchaseId, rolls: 1, sqm_per_roll: 1, unit_price: 1, price_basis: "kg" })).toBe("23514");
+    expect(await bad("purchase_costs", { purchase_id: purchaseId, kind: "tips", amount: 1 })).toBe("23514");
+    expect(await bad("purchase_costs", { purchase_id: purchaseId, kind: "other", amount: -1 })).toBe("23514");
+  });
+
+  it("keeps a supplier that has purchases, and deletes a purchase with its lines", async () => {
+    const blocked = await admin.from("suppliers").delete().eq("id", supplierId);
+    expect(blocked.error?.code).toBe("23503");
+
+    const id = await insert("purchases", { supplier_id: supplierId, destination: "AE", exchange_rate: 3.67 });
+    await service.from("purchase_items").insert({ purchase_id: id, description: "x", rolls: 1, sqm_per_roll: 1, unit_price: 1 });
+    await service.from("purchase_costs").insert({ purchase_id: id, kind: "other", amount: 1 });
+    const removed = await admin.from("purchases").delete().eq("id", id).select("id");
+    expect(removed.data).toHaveLength(1);
+    expect((await service.from("purchase_items").select("id").eq("purchase_id", id)).data).toEqual([]);
+    expect((await service.from("purchase_costs").select("id").eq("purchase_id", id)).data).toEqual([]);
+  });
+
+  it("keeps a product line when its catalogue product is deleted", async () => {
+    const category = await insert("categories", { slug: slug("cat-buy"), name: "Bought category" });
+    const product = await insert("products", { slug: slug("prod-buy"), category_id: category, name: "Bought product" });
+    const line = await service.from("purchase_items").insert({ purchase_id: purchaseId, product_id: product, rolls: 1, sqm_per_roll: 1, unit_price: 1 }).select("id").single();
+    await service.from("products").delete().eq("id", product);
+    const { data } = await service.from("purchase_items").select("product_id").eq("id", line.data!.id).single();
+    expect(data).toEqual({ product_id: null });
+  });
+});
+
 describe("database guards", () => {
   const publicTables = `
     select c.relname as tablename, c.relrowsecurity as rowsecurity, c.oid
@@ -557,9 +635,9 @@ describe("database guards", () => {
     expect(rows.map((row) => row.tablename).sort()).toEqual(
       [
         "admins", "applications", "categories", "certifications", "product_applications",
-        "products", "project_products", "projects", "quote_recipients", "quote_requests",
-        "site_settings", "spec_models", "spec_properties", "spec_values",
-        "wholesale_buyer_notes", "wholesale_buyers",
+        "products", "project_products", "projects", "purchase_costs", "purchase_items", "purchases",
+        "quote_recipients", "quote_requests", "site_settings", "spec_models", "spec_properties", "spec_values",
+        "suppliers", "wholesale_buyer_notes", "wholesale_buyers",
       ],
     );
     expect(rows.filter((row) => !row.rowsecurity).map((row) => row.tablename)).toEqual([]);
@@ -578,7 +656,8 @@ describe("database guards", () => {
   it("gives anon no access at all to private tables", async () => {
     const { rows } = await db.query<{ tablename: string }>(
       `select t.tablename from (${publicTables}) t
-       where t.tablename in ('quote_requests', 'quote_recipients', 'admins', 'wholesale_buyers', 'wholesale_buyer_notes')
+       where t.tablename in ('quote_requests', 'quote_recipients', 'admins', 'wholesale_buyers', 'wholesale_buyer_notes',
+                             'suppliers', 'purchases', 'purchase_items', 'purchase_costs')
          and has_table_privilege('anon', t.oid, 'select')`,
     );
     expect(rows).toEqual([]);
