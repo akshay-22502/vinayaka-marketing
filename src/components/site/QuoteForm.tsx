@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useId, useRef, useState, type FormEvent, type HTMLInputTypeAttribute } from "react";
+import { trackQuoteRequest } from "@/lib/analytics";
 import type { Country } from "@/lib/content/types";
 import { ATTACHMENT_ACCEPT, validateAttachment } from "@/lib/quote/attachment";
 import {
@@ -313,6 +314,7 @@ export function QuoteForm({ options, preselected, siteKey }: Props) {
     sending.current = false;
 
     if (outcome.kind === "sent") {
+      trackQuoteRequest(outcome.team, values.products.length);
       setTeam(outcome.team);
       setStatus("sent");
       return;
