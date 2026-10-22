@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { IMAGE_ACCEPT, MAX_UPLOAD_BYTES, PDF_ACCEPT } from "../../src/lib/admin/upload";
+import { DOCUMENT_ACCEPT, IMAGE_ACCEPT, MAX_DOCUMENT_BYTES, MAX_UPLOAD_BYTES, PDF_ACCEPT } from "../../src/lib/admin/upload";
 import { createUser, serviceClient, signedInClient } from "./helpers";
 
 // public-media accepts only what the admin screens upload: PNG, JPEG, WebP and PDF, up to
@@ -51,6 +51,15 @@ describe("public-media limits", () => {
     expect([...rows[0].allowed_mime_types].sort()).toEqual(offered);
     expect(offered).toEqual(["application/pdf", "image/jpeg", "image/png", "image/webp"]);
     expect(Number(rows[0].file_size_limit)).toBe(MAX_UPLOAD_BYTES);
+  });
+
+  it("purchase-documents allows exactly what the documents form offers (migration and upload.ts agree)", async () => {
+    const { rows } = await db.query<{ public: boolean; allowed_mime_types: string[]; file_size_limit: string }>(
+      "select public, allowed_mime_types, file_size_limit from storage.buckets where id = 'purchase-documents'",
+    );
+    expect(rows[0].public).toBe(false);
+    expect([...rows[0].allowed_mime_types].sort()).toEqual(DOCUMENT_ACCEPT.split(",").map((type) => type.trim()).sort());
+    expect(Number(rows[0].file_size_limit)).toBe(MAX_DOCUMENT_BYTES);
   });
 
   it("does not touch the quote-attachments bucket", async () => {

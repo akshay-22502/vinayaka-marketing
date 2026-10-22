@@ -10,6 +10,25 @@ export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 export const IMAGE_ACCEPT = "image/png,image/jpeg,image/webp";
 export const PDF_ACCEPT = "application/pdf";
 
+/**
+ * What a purchase document may be: PDF, a photo, Excel, Word or CSV. The purchase-documents bucket
+ * lists the same types (migration 20261022000001_purchase_documents.sql).
+ */
+export const DOCUMENT_ACCEPT = [
+  "application/pdf",
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/msword",
+  "text/csv",
+].join(",");
+
+/** Largest purchase document: scanned bills of entry run to several pages. */
+export const MAX_DOCUMENT_BYTES = 20 * 1024 * 1024;
+
 const MAX_NAME_LENGTH = 60;
 const UUID_PREFIX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-/i;
 
@@ -45,6 +64,11 @@ const FRIENDLY_TYPES: Record<string, string> = {
   "image/jpeg": "JPEG",
   "image/webp": "WebP",
   "application/pdf": "PDF",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "Excel",
+  "application/vnd.ms-excel": "Excel",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "Word",
+  "application/msword": "Word",
+  "text/csv": "CSV",
   "image/*": "an image",
   ".png": "PNG",
   ".jpg": "JPEG",

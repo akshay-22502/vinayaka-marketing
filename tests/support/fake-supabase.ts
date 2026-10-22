@@ -5,15 +5,19 @@ export type Op = { name: string; args: unknown[] };
 export type Query = { table: string; ops: Op[] };
 export type Outcome = { data?: unknown; error?: { code?: string; message: string; details?: string } | null };
 export type RpcCall = { name: string; args: Record<string, unknown> };
+export type StorageCall = { bucket: string; method: string; args: unknown[] };
 
 export function createFakeSupabase(options: {
   answer?: (query: Query) => Outcome;
   answerRpc?: (call: RpcCall) => Outcome;
+  answerStorage?: (call: StorageCall) => Outcome;
 }) {
   const answer: (query: Query) => Outcome = options.answer ?? (() => ({ data: [{ id: "row" }] }));
   const answerRpc: (call: RpcCall) => Outcome = options.answerRpc ?? (() => ({ data: null }));
   const queries: Query[] = [];
   const rpcCalls: RpcCall[] = [];
+  const answerStorage: (call: StorageCall) => Outcome = options.answerStorage ?? (() => ({ data: [] }));
+  const storageCalls: StorageCall[] = [];
 
   const supabase = {
     from(table: string) {
@@ -38,7 +42,18 @@ export function createFakeSupabase(options: {
       const outcome = answerRpc(call);
       return Promise.resolve({ data: outcome.data ?? null, error: outcome.error ?? null });
     },
+    storage: {
+      from(bucket: string) {
+        const call = (method: string) => (...args: unknown[]) => {
+          const storageCall: StorageCall = { bucket, method, args };
+          storageCalls.push(storageCall);
+          const outcome = answerStorage(storageCall);
+          return Promise.resolve({ data: outcome.data ?? null, error: outcome.error ?? null });
+        };
+        return { remove: call("remove"), createSignedUrl: call("createSignedUrl") };
+      },
+    },
   };
 
-  return { supabase, queries, rpcCalls };
+  return { supabase, queries, rpcCalls, storageCalls };
 }

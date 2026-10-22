@@ -1,10 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import type { z } from "zod";
 import { redirect } from "next/navigation";
 import { FORM_ERROR, NOT_FOUND_MESSAGE, failure, type ActionResult } from "@/lib/admin/action-result";
 import { dbFailure } from "@/lib/admin/crud";
-import { purchaseCostSchema, purchaseItemSchema, purchaseSchema } from "@/lib/admin/purchases";
+import { DOCUMENTS_BUCKET } from "@/lib/admin/documents";
+import { PURCHASE_STEPS, STEP_SCHEMAS, purchaseCostSchema, purchaseItemSchema, type PurchaseStep } from "@/lib/admin/purchases";
 import { requireAdmin } from "@/lib/admin/require-admin";
 import { UUID_PATTERN, parseForm } from "@/lib/admin/schemas";
 
@@ -30,13 +32,26 @@ function postedId(form: FormData): string | null | undefined {
   return typeof raw === "string" && UUID_PATTERN.test(raw) ? raw : undefined;
 }
 
-/** Creates a purchase (then opens its page, where products and costs are added), or saves the one named by `id`. */
+/** The step a purchase form saves (hidden `step` field): the quotation when none is posted. */
+function postedStep(form: FormData): PurchaseStep | undefined {
+  const raw = form.get("step");
+  if (raw === null || raw === "") return "quotation";
+  return PURCHASE_STEPS.find((step) => step === raw);
+}
+
+/**
+ * Creates a purchase from its quotation (then opens its page, where the other steps are filled
+ * in), or saves one step's fields of the purchase named by `id`. A step's form only writes that
+ * step's columns.
+ */
 export async function savePurchase(_previous: ActionResult | null, form: FormData): Promise<ActionResult> {
   const { supabase } = await requireAdmin();
 
   const id = postedId(form);
   if (id === undefined) return failure({ [FORM_ERROR]: BAD_ID_MESSAGE });
-  const parsed = parseForm(purchaseSchema, form);
+  const step = postedStep(form);
+  if (step === undefined || (id === null && step !== "quotation")) return failure({ [FORM_ERROR]: BAD_ID_MESSAGE });
+  const parsed = parseForm<z.ZodType<Record<string, unknown>>>(STEP_SCHEMAS[step], form);
   if (!parsed.ok) return failure(parsed.errors);
 
   if (id === null) {
@@ -56,13 +71,25 @@ export async function savePurchase(_previous: ActionResult | null, form: FormDat
   return { ok: true };
 }
 
-/** Deletes a purchase with its products and costs. */
+/** Deletes a purchase with its products, costs and documents (their files too). */
 export async function deletePurchase(id: string): Promise<ActionResult> {
   const { supabase } = await requireAdmin();
   if (typeof id !== "string" || !UUID_PATTERN.test(id)) return failure({ [FORM_ERROR]: BAD_ID_MESSAGE });
 
+  // The document rows go with the purchase (on delete cascade); their files are removed after.
+  const documents = await supabase.from("purchase_documents").select("file_path").eq("purchase_id", id);
+  if (documents.error) return dbFailure(documents.error);
+
   const { error } = await supabase.from("purchases").delete().eq("id", id);
   if (error) return dbFailure(error);
+
+  const paths = ((documents.data ?? []) as { file_path?: unknown }[])
+    .map((row) => row.file_path)
+    .filter((path): path is string => typeof path === "string" && path !== "");
+  if (paths.length > 0) {
+    const removed = await supabase.storage.from(DOCUMENTS_BUCKET).remove(paths);
+    if (removed.error) console.error("Could not delete a purchase's document files", removed.error);
+  }
 
   refresh();
   return { ok: true };

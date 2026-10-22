@@ -794,3 +794,106 @@ describe("ensureUser", () => {
     }
   });
 });
+
+describe("purchase documents", () => {
+  let purchaseId: string;
+  let categoryId: string;
+  const path = () => `purchases/${purchaseId}/${run}-invoice.pdf`;
+
+  beforeAll(async () => {
+    const supplierId = await insert("suppliers", { name: `Document supplier ${run}` });
+    purchaseId = await insert("purchases", { supplier_id: supplierId, destination: "IN", exchange_rate: 84 });
+    categoryId = await insert("document_categories", { name: `Category ${run}`, sort_order: 5 });
+    await insert("purchase_documents", { purchase_id: purchaseId, category_id: categoryId, title: "Invoice", file_path: path() });
+  });
+
+  it("starts with the standard categories", async () => {
+    const { data } = await service.from("document_categories").select("name").in("name", ["Commercial invoice", "Packing list", "Bill of lading", "Other"]);
+    expect(data).toHaveLength(4);
+  });
+
+  it("files a cost saved without a step under its kind's step, and refuses unknown steps", async () => {
+    const stepOf = async (kind: string) => {
+      const { data, error } = await service.from("purchase_costs").insert({ purchase_id: purchaseId, kind, amount: 1 }).select("stage").single();
+      expect(error).toBeNull();
+      return data?.stage;
+    };
+    expect(await stepOf("supplier_charges")).toBe("quotation");
+    expect(await stepOf("customs_duty")).toBe("port");
+    expect(await stepOf("transport")).toBe("delivery");
+    expect(await stepOf("bank_charges")).toBe("payment");
+    const bad = await service.from("purchase_costs").insert({ purchase_id: purchaseId, kind: "other", amount: 1, stage: "customs" });
+    expect(bad.error?.code).toBe("23514");
+    const badDocument = await service.from("purchase_documents").insert({ purchase_id: purchaseId, title: "x", file_path: `purchases/${purchaseId}/s.pdf`, stage: "customs" });
+    expect(badDocument.error?.code).toBe("23514");
+  });
+
+  it("keeps the step fields and rates in range", async () => {
+    const update = (row: Record<string, unknown>) => service.from("purchases").update(row).eq("id", purchaseId);
+    expect((await update({ status: "quotation", incoterm: "FOB", bank_rate: 86.4, inr_per_aed: 23.1 })).error).toBeNull();
+    expect((await update({ status: "delivered" })).error).toBeNull();
+    expect((await update({ incoterm: "XYZ" })).error?.code).toBe("23514");
+    expect((await update({ bank_rate: 0 })).error?.code).toBe("23514");
+  });
+
+  it("are hidden from visitors and signed-in non-admins, who cannot write them either", async () => {
+    for (const client of [anon, member]) {
+      for (const table of ["document_categories", "purchase_documents"]) {
+        const { data } = await client.from(table).select("*");
+        expect(data ?? [], table).toHaveLength(0);
+      }
+      expect((await client.from("document_categories").insert({ name: `x-${run}` })).error).not.toBeNull();
+      const document = { purchase_id: purchaseId, title: "x", file_path: `purchases/${purchaseId}/x-${run}.pdf` };
+      expect((await client.from("purchase_documents").insert(document)).error).not.toBeNull();
+    }
+  });
+
+  it("an admin can read and write them, and category names are unique whatever the capitals", async () => {
+    const { data, error } = await admin.from("purchase_documents").select("id, title").eq("purchase_id", purchaseId);
+    expect(error).toBeNull();
+    expect(data).toHaveLength(1);
+    const same = await admin.from("document_categories").insert({ name: `CATEGORY ${run}` });
+    expect(same.error?.code).toBe("23505");
+  });
+
+  it("refuses a file outside the purchases folder", async () => {
+    const { error } = await service.from("purchase_documents").insert({ purchase_id: purchaseId, title: "x", file_path: "products/x.pdf" });
+    expect(error?.code).toBe("23514");
+  });
+
+  it("keeps a category's documents when the category is deleted, and drops them with their purchase", async () => {
+    const otherCategory = await insert("document_categories", { name: `Temporary ${run}` });
+    const documentId = await insert("purchase_documents", {
+      purchase_id: purchaseId,
+      category_id: otherCategory,
+      title: "Packing list",
+      file_path: `purchases/${purchaseId}/${run}-packing.pdf`,
+    });
+    await admin.from("document_categories").delete().eq("id", otherCategory);
+    const { data } = await service.from("purchase_documents").select("category_id").eq("id", documentId).single();
+    expect(data?.category_id).toBeNull();
+
+    const supplierId = await insert("suppliers", { name: `Gone supplier ${run}` });
+    const gone = await insert("purchases", { supplier_id: supplierId, destination: "IN", exchange_rate: 1 });
+    await service.from("purchase_documents").insert({ purchase_id: gone, title: "x", file_path: `purchases/${gone}/x.pdf` });
+    await admin.from("purchases").delete().eq("id", gone);
+    const left = await service.from("purchase_documents").select("id").eq("purchase_id", gone);
+    expect(left.data).toEqual([]);
+  });
+
+  it("keeps the files private: only an admin can upload, list or sign them", async () => {
+    const file = new Blob(["%PDF-1.4"], { type: "application/pdf" });
+    const upload = await admin.storage.from("purchase-documents").upload(path(), file, { contentType: "application/pdf" });
+    expect(upload.error).toBeNull();
+    uploaded.push({ bucket: "purchase-documents", path: path() });
+
+    for (const client of [anon, member]) {
+      expect((await client.storage.from("purchase-documents").upload(`purchases/${purchaseId}/x-${run}.pdf`, file, { contentType: "application/pdf" })).error).not.toBeNull();
+      expect((await client.storage.from("purchase-documents").createSignedUrl(path(), 60)).error).not.toBeNull();
+    }
+    const signed = await admin.storage.from("purchase-documents").createSignedUrl(path(), 60);
+    expect(signed.error).toBeNull();
+    const removed = await admin.storage.from("purchase-documents").remove([path()]);
+    expect(removed.error).toBeNull();
+  });
+});

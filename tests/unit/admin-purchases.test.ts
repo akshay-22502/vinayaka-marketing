@@ -1,13 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SUPPLIER_GONE_MESSAGE, SUPPLIER_HAS_PURCHASES_MESSAGE, fromPgError } from "@/lib/admin/action-result";
 import {
+  COST_KIND_LABELS,
+  DEFAULT_COST_STEP,
   ITEM_NEEDS_PRODUCT_MESSAGE,
+  PURCHASE_STEPS,
+  STEP_COST_KINDS,
+  deliveryStepSchema,
+  effectiveRate,
+  inCurrencies,
+  paymentStepSchema,
   formatMoney,
   localCurrency,
   parsePurchaseFilters,
   purchaseCostSchema,
   purchaseItemSchema,
-  purchaseSchema,
+  portStepSchema,
+  quotationStepSchema,
   purchaseSums,
   purchasesHref,
 } from "@/lib/admin/purchases";
@@ -165,19 +174,24 @@ describe("schemas", () => {
   });
 
   it("a purchase needs a supplier, a country and an exchange rate above 0", () => {
-    expect(parseForm(purchaseSchema, form({ status: "ordered", currency: "USD", exchange_rate: "0" }))).toEqual({
+    expect(parseForm(quotationStepSchema, form({ status: "ordered", currency: "USD", exchange_rate: "0" }))).toEqual({
       ok: false,
       errors: { supplier_id: "Choose a supplier", destination: "Choose where the goods go", exchange_rate: "Enter a number above 0" },
     });
-    const parsed = parseForm(purchaseSchema, form({ ...purchaseForm, exchange_rate: " 1,083.25 ", order_date: "2026-10-20", container_type: "40ft_hc" }));
+    const parsed = parseForm(quotationStepSchema, form({ ...purchaseForm, exchange_rate: " 1,083.25 ", order_date: "2026-10-20", incoterm: "FOB" }));
     expect(parsed).toMatchObject({
       ok: true,
-      data: { exchange_rate: 1083.25, order_date: "2026-10-20", arrival_date: null, container_type: "40ft_hc", container_count: 1 },
+      data: { exchange_rate: 1083.25, order_date: "2026-10-20", quotation_date: null, incoterm: "FOB" },
     });
-    expect(parseForm(purchaseSchema, form({ ...purchaseForm, exchange_rate: "abc", container_count: "1.5", order_date: "2026-02-30" }))).toEqual({
+    expect(parseForm(quotationStepSchema, form({ ...purchaseForm, exchange_rate: "abc", order_date: "2026-02-30", incoterm: "XYZ" }))).toEqual({
       ok: false,
-      errors: { exchange_rate: "Enter a number, for example 12.5", container_count: "Enter a whole number", order_date: "Enter a valid date" },
+      errors: { exchange_rate: "Enter a number, for example 12.5", order_date: "Enter a valid date", incoterm: "Choose the delivery terms" },
     });
+    expect(parseForm(portStepSchema, form({ container_type: "40ft_hc", arrival_date: "2026-11-02" }))).toMatchObject({
+      ok: true,
+      data: { container_type: "40ft_hc", container_count: 1, arrival_date: "2026-11-02", bill_of_entry_number: "" },
+    });
+    expect(parseForm(portStepSchema, form({ container_count: "1.5" }))).toMatchObject({ ok: false, errors: { container_count: "Enter a whole number" } });
   });
 
   it("a product line needs a product or a description, rolls, a roll size and a price", () => {
@@ -210,7 +224,7 @@ describe("schemas", () => {
       parseForm(purchaseCostSchema, form({ purchase_id: PURCHASE_ID, kind: "freight", amount: "1,500", paid_in: "purchase", in_landed_cost: "on" })),
     ).toEqual({
       ok: true,
-      data: { purchase_id: PURCHASE_ID, kind: "freight", description: "", amount: 1500, in_purchase_currency: true, in_landed_cost: true },
+      data: { purchase_id: PURCHASE_ID, stage: "port", kind: "freight", description: "", amount: 1500, in_purchase_currency: true, in_landed_cost: true },
     });
     expect(parseForm(purchaseCostSchema, form({ purchase_id: PURCHASE_ID, kind: "import_tax", amount: "9", paid_in: "local" }))).toMatchObject({
       ok: true,
@@ -324,5 +338,79 @@ describe("actions", () => {
     expect(await savePurchase(null, form({ ...purchaseForm, id: "nope" }))).toMatchObject({ ok: false });
     expect(await savePurchaseCost(null, form({ id: "nope" }))).toMatchObject({ ok: false });
     expect(queries).toEqual([]);
+  });
+});
+
+describe("purchase steps and the final price", () => {
+  const items = [{ id: "a", rolls: 10, sqm_per_roll: "100", price_basis: "sqm", unit_price: "0.5" }];
+  // 1,000 m² at $0.50 = $500; ₹10,000 of costs.
+  const costs = [{ amount: "10000", in_purchase_currency: false, in_landed_cost: true }];
+
+  it("uses the bank's rate once entered, else the expected rate", () => {
+    const expected = { currency: "USD", exchange_rate: "84", destination: "IN" as const };
+    expect(effectiveRate(expected)).toBe(84);
+    expect(effectiveRate({ ...expected, bank_rate: "86.5" })).toBe(86.5);
+    expect(effectiveRate({ ...expected, bank_rate: null })).toBe(84);
+    // ₹42,000 + ₹10,000 over 1,000 m² = ₹52; at the bank's 86 it is ₹43,000 + ₹10,000 = ₹53.
+    expect(purchaseSums(expected, items, costs).landedPerSqm).toBeCloseTo(52);
+    expect(purchaseSums({ ...expected, bank_rate: 86 }, items, costs).landedPerSqm).toBeCloseTo(53);
+  });
+
+  it("shows a price in rupees, US dollars and dirhams when the rates are there", () => {
+    const india = { currency: "USD", exchange_rate: "84", bank_rate: "85", destination: "IN" as const, inr_per_aed: "23" };
+    expect(inCurrencies(46, india)).toEqual({ INR: 46, USD: 46 / 85, AED: 2 });
+    expect(inCurrencies(46, { ...india, inr_per_aed: null })).toEqual({ INR: 46, USD: 46 / 85, AED: null });
+    // Paid in yuan: dollars need their own rate.
+    expect(inCurrencies(46, { ...india, currency: "CNY", bank_rate: "11.8" }).USD).toBeNull();
+    expect(inCurrencies(46, { ...india, currency: "CNY", bank_rate: "11.8", usd_rate: "92" }).USD).toBeCloseTo(0.5);
+    const uae = { currency: "USD", exchange_rate: "3.6725", destination: "AE" as const, inr_per_aed: "23" };
+    expect(inCurrencies(10, uae)).toEqual({ INR: 230, USD: 10 / 3.6725, AED: 10 });
+  });
+
+  it("reads each step's own fields", () => {
+    expect(parseForm(paymentStepSchema, form({ bank_rate: "86.25", inr_per_aed: "", payment_date: "2026-11-05" }))).toEqual({
+      ok: true,
+      data: { payment_date: "2026-11-05", bank_name: "", bank_rate: 86.25, usd_rate: null, inr_per_aed: null },
+    });
+    expect(parseForm(paymentStepSchema, form({ bank_rate: "0" }))).toMatchObject({ ok: false, errors: { bank_rate: "Enter the bank's rate above 0" } });
+    expect(parseForm(deliveryStepSchema, form({ delivered_to: " Rakhial godown ", delivery_date: "" }))).toEqual({
+      ok: true,
+      data: { delivery_date: null, delivered_to: "Rakhial godown", transporter: "" },
+    });
+  });
+
+  it("files a cost under its step, and only accepts that step's kinds", () => {
+    expect(parseForm(purchaseCostSchema, form({ purchase_id: PURCHASE_ID, kind: "transport", amount: "5", paid_in: "local" }))).toMatchObject({
+      ok: true,
+      data: { stage: "delivery" },
+    });
+    expect(parseForm(purchaseCostSchema, form({ purchase_id: PURCHASE_ID, stage: "payment", kind: "bank_charges", amount: "5", paid_in: "local" }))).toMatchObject({
+      ok: true,
+      data: { stage: "payment", kind: "bank_charges" },
+    });
+    expect(parseForm(purchaseCostSchema, form({ purchase_id: PURCHASE_ID, stage: "delivery", kind: "customs_duty", amount: "5", paid_in: "local" }))).toMatchObject({
+      ok: false,
+      errors: { kind: "Choose a cost from the list" },
+    });
+    for (const step of PURCHASE_STEPS) {
+      for (const kind of STEP_COST_KINDS[step]) {
+        expect(COST_KIND_LABELS[kind]).toBeTruthy();
+        // A kind's default step always offers it.
+        expect(STEP_COST_KINDS[DEFAULT_COST_STEP[kind]]).toContain(kind);
+      }
+    }
+  });
+
+  it("saves only the posted step's columns", async () => {
+    const { queries } = fakeSupabase(() => ({ data: [{ id: PURCHASE_ID }] }));
+    expect(await savePurchase(null, form({ id: PURCHASE_ID, step: "payment", bank_rate: "86", supplier_id: "x" }))).toEqual({ ok: true });
+    expect(queries[0].ops[0]).toEqual({
+      name: "update",
+      args: [{ payment_date: null, bank_name: "", bank_rate: 86, usd_rate: null, inr_per_aed: null }],
+    });
+    expect(await savePurchase(null, form({ id: PURCHASE_ID, step: "customs" }))).toMatchObject({ ok: false });
+    // A new purchase starts from its quotation only.
+    expect(await savePurchase(null, form({ step: "port" }))).toMatchObject({ ok: false });
+    expect(queries).toHaveLength(1);
   });
 });
