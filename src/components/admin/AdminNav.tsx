@@ -8,6 +8,7 @@ import { signOut } from "@/app/admin/actions";
 
 const SECTIONS = [
   { label: "Dashboard", href: "/admin" },
+  { label: "Analytics", href: "/admin/analytics" },
   { label: "Quotes", href: "/admin/quotes" },
   { label: "Buyers", href: "/admin/buyers" },
   { label: "Suppliers", href: "/admin/suppliers" },
