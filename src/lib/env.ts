@@ -96,8 +96,8 @@ function turnstileSiteKey(): string | undefined {
  */
 function gaMeasurementId(): string | undefined {
   if (isVercelPreview()) return undefined;
-  // Written out in full (not process.env[name]) so Next can inline it.
-  const id = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID?.trim().toUpperCase();
+  // Server-only (no NEXT_PUBLIC_ prefix): SiteFrame reads it while rendering and passes the ID down.
+  const id = process.env.NEXT_GA_MEASUREMENT_ID?.trim().toUpperCase();
   return id && /^G-[A-Z0-9]{4,}$/.test(id) ? id : undefined;
 }
 
@@ -110,7 +110,7 @@ export const env = {
   get NEXT_PUBLIC_TURNSTILE_SITE_KEY(): string | undefined {
     return turnstileSiteKey();
   },
-  get NEXT_PUBLIC_GA_MEASUREMENT_ID(): string | undefined {
+  get GA_MEASUREMENT_ID(): string | undefined {
     return gaMeasurementId();
   },
   isVercelPreview,

@@ -11,7 +11,7 @@ import { QuoteFab } from "./QuoteFab";
  */
 export async function SiteFrame({ children }: { children: React.ReactNode }) {
   const [settings, nav] = await Promise.all([getSiteSettings(), getNavVisibility()]);
-  const gaId = env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
+  const gaId = env.GA_MEASUREMENT_ID;
 
   return (
     <div className="flex min-h-screen flex-col">
