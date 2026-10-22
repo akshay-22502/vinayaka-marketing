@@ -133,8 +133,9 @@ function isRealDate(value: string): boolean {
   const date = new Date(`${value}T00:00:00Z`);
   return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
 }
+/** An optional date from a date field: null when left empty. */
 
-const optionalDate = z
+export const optionalDate = z
   .string()
   .trim()
   .default("")

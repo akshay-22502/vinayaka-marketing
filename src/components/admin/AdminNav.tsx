@@ -13,6 +13,7 @@ const SECTIONS = [
   { label: "Buyers", href: "/admin/buyers" },
   { label: "Suppliers", href: "/admin/suppliers" },
   { label: "Purchases", href: "/admin/purchases" },
+  { label: "Document categories", href: "/admin/document-categories" },
   { label: "Products", href: "/admin/products" },
   { label: "Categories", href: "/admin/categories" },
   { label: "Applications", href: "/admin/applications" },

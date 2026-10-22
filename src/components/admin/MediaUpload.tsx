@@ -23,6 +23,8 @@ type Props = {
   /** Show the Remove button. A list that has its own remove control turns it off. */
   removable?: boolean;
   maxBytes?: number;
+  /** The bucket is private: show the file name only, with no preview or link (it has no public URL). */
+  privateFile?: boolean;
   /** Called with the new path (or null after Remove). */
   onChange?: (path: string | null) => void;
 };
@@ -44,6 +46,7 @@ export function MediaUpload({
   hint,
   removable = true,
   maxBytes = MAX_UPLOAD_BYTES,
+  privateFile = false,
   onChange,
 }: Props) {
   const [path, setPath] = useState(value ?? "");
@@ -96,7 +99,7 @@ export function MediaUpload({
     inputRef.current?.focus();
   }
 
-  const url = path ? publicMediaUrl(path) : null;
+  const url = path && !privateFile ? publicMediaUrl(path) : null;
 
   return (
     <div data-uploading={uploading ? "true" : undefined}>
@@ -110,9 +113,9 @@ export function MediaUpload({
         </p>
       ) : null}
 
-      {path && url ? (
+      {path ? (
         <div className="mt-2 flex items-center gap-3 rounded-md border border-slate-200 bg-slate-50 p-2">
-          {isImagePath(path) ? (
+          {url && isImagePath(path) ? (
             // A plain <img>: the admin preview needs no optimisation, and the file may be any size.
             // eslint-disable-next-line @next/next/no-img-element
             <img src={url} alt="" className="size-20 shrink-0 rounded border border-slate-200 bg-white object-contain" />
@@ -123,14 +126,16 @@ export function MediaUpload({
           )}
           <div className="min-w-0 flex-1">
             <p className="break-all text-sm font-medium text-slate-900">{displayName(path)}</p>
-            <a
-              href={url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm font-semibold text-navy underline underline-offset-4"
-            >
-              Open file<span className="sr-only"> ({label}, opens in a new tab)</span>
-            </a>
+            {url ? (
+              <a
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm font-semibold text-navy underline underline-offset-4"
+              >
+                Open file<span className="sr-only"> ({label}, opens in a new tab)</span>
+              </a>
+            ) : null}
           </div>
           {removable ? (
             <button

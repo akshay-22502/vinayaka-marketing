@@ -1,3 +1,4 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -6,7 +7,16 @@ import { EntityForm } from "@/components/admin/EntityForm";
 import { Field } from "@/components/admin/Field";
 import { NoteDeleteButton } from "@/components/admin/NoteDeleteButton";
 import { PageHeader } from "@/components/admin/PageHeader";
+import { MediaUpload } from "@/components/admin/MediaUpload";
 import { PurchaseStatusBadge } from "@/components/admin/PurchaseStatusBadge";
+import {
+  DOCUMENTS_BUCKET,
+  DOCUMENT_LINK_SECONDS,
+  documentFolder,
+  groupDocuments,
+  type CategoryRow,
+  type DocumentRow,
+} from "@/lib/admin/documents";
 import {
   CONTAINER_TYPES,
   CONTAINER_TYPE_LABELS,
@@ -26,6 +36,7 @@ import {
 } from "@/lib/admin/purchases";
 import { requireAdmin } from "@/lib/admin/require-admin";
 import { UUID_PATTERN } from "@/lib/admin/schemas";
+import { DOCUMENT_ACCEPT, MAX_DOCUMENT_BYTES, displayName } from "@/lib/admin/upload";
 import type { Country } from "@/lib/content/types";
 import { countryName, formatDate } from "@/lib/format";
 import {
@@ -36,6 +47,7 @@ import {
   savePurchaseCost,
   savePurchaseItem,
 } from "../actions";
+import { deletePurchaseDocument, savePurchaseDocument } from "../document-actions";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -197,6 +209,59 @@ function CostFields({ purchaseId, cost, currency, local }: { purchaseId: string;
   );
 }
 
+/** The fields of a document. A new one also has the file; an existing one keeps its file. */
+function DocumentFields({ purchaseId, document, categories }: { purchaseId: string; document: DocumentRow | null; categories: Option[] }) {
+  return (
+    <div className="space-y-6">
+      <input type="hidden" name="purchase_id" value={purchaseId} />
+      {document ? null : (
+        <MediaUpload
+          bucket={DOCUMENTS_BUCKET}
+          folder={documentFolder(purchaseId)}
+          value={null}
+          accept={DOCUMENT_ACCEPT}
+          maxBytes={MAX_DOCUMENT_BYTES}
+          name="file_path"
+          label="File"
+          hint="PDF, photo, Excel, Word or CSV, up to 20 MB."
+          privateFile
+        />
+      )}
+      <Field label="Category" name="category_id" type="select" options={categories} defaultValue={document?.category_id ?? ""} />
+      <Field
+        label="Title"
+        name="title"
+        required={document !== null}
+        maxLength={200}
+        defaultValue={document?.title}
+        hint={document ? undefined : "Optional. Leave empty to use the file name. For example Commercial invoice AL240618."}
+      />
+      <Field label="Document date" name="document_date" type="date" defaultValue={document?.document_date} />
+      <Field label="Notes" name="notes" type="textarea" rows={3} maxLength={2000} spellCheck defaultValue={document?.notes} />
+    </div>
+  );
+}
+
+type DocumentLink = { url: string; name: string } | null;
+
+/** A 10-minute download link for each document, made with the admin's own session. A failed one is only left without a link. */
+async function documentLinks(supabase: SupabaseClient, documents: DocumentRow[]): Promise<Map<string, DocumentLink>> {
+  const entries = await Promise.all(
+    documents.map(async (document): Promise<[string, DocumentLink]> => {
+      const name = displayName(document.file_path);
+      const { data, error } = await supabase.storage
+        .from(DOCUMENTS_BUCKET)
+        .createSignedUrl(document.file_path, DOCUMENT_LINK_SECONDS, { download: name });
+      if (error || !/^https?:\/\//i.test(data.signedUrl)) {
+        if (error) console.error("Could not sign a purchase document", error);
+        return [document.id, null];
+      }
+      return [document.id, { url: data.signedUrl, name }];
+    }),
+  );
+  return new Map(entries);
+}
+
 function Figure({ label, value, detail }: { label: string; value: string; detail?: string }) {
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-4">
@@ -250,7 +315,7 @@ export default async function PurchasePage({ params, searchParams }: Props) {
   }
 
   if (!UUID_PATTERN.test(id)) notFound();
-  const [purchaseResult, itemsResult, costsResult, productsResult] = await Promise.all([
+  const [purchaseResult, itemsResult, costsResult, productsResult, documentsResult, categoriesResult] = await Promise.all([
     supabase.from("purchases").select(COLUMNS).eq("id", id).maybeSingle(),
     supabase
       .from("purchase_items")
@@ -265,11 +330,21 @@ export default async function PurchasePage({ params, searchParams }: Props) {
       .order("created_at")
       .order("id"),
     supabase.from("products").select("id, name").order("name"),
+    supabase
+      .from("purchase_documents")
+      .select("id, category_id, title, file_path, document_date, notes, created_at")
+      .eq("purchase_id", id)
+      .order("document_date", { ascending: true, nullsFirst: false })
+      .order("created_at")
+      .order("id"),
+    supabase.from("document_categories").select("id, name, sort_order").order("sort_order").order("name"),
   ]);
   if (purchaseResult.error) throw new Error(`Could not load the purchase: ${purchaseResult.error.message}`);
   if (itemsResult.error) throw new Error(`Could not load the purchase's products: ${itemsResult.error.message}`);
   if (costsResult.error) throw new Error(`Could not load the purchase's costs: ${costsResult.error.message}`);
   if (productsResult.error) throw new Error(`Could not load products: ${productsResult.error.message}`);
+  if (documentsResult.error) throw new Error(`Could not load the purchase's documents: ${documentsResult.error.message}`);
+  if (categoriesResult.error) throw new Error(`Could not load the document categories: ${categoriesResult.error.message}`);
   if (!purchaseResult.data) notFound();
   const purchase = purchaseResult.data as unknown as PurchaseRow;
   const items = (itemsResult.data ?? []) as unknown as ItemRow[];
@@ -278,6 +353,12 @@ export default async function PurchasePage({ params, searchParams }: Props) {
     { value: "", label: "Not in the catalogue (describe it below)" },
     ...((productsResult.data ?? []) as { id: string; name: string }[]).map((row) => ({ value: row.id, label: row.name })),
   ];
+
+  const documents = (documentsResult.data ?? []) as DocumentRow[];
+  const categories = (categoriesResult.data ?? []) as CategoryRow[];
+  const documentGroups = groupDocuments(documents, categories);
+  const links = await documentLinks(supabase, documents);
+  const categoryOptions = [{ value: "", label: "No category" }, ...categories.map((row) => ({ value: row.id, label: row.name }))];
 
   const currency = purchase.currency;
   const local = localCurrency(purchase.destination);
@@ -474,6 +555,80 @@ export default async function PurchasePage({ params, searchParams }: Props) {
           <div className="mt-4" role="region" aria-labelledby="add-cost-heading">
             <EntityForm key={`cost-${costs.length}-${costs.at(-1)?.id ?? "none"}`} action={savePurchaseCost} listHref={`/admin/purchases/${purchase.id}`} submitLabel="Add cost">
               <CostFields purchaseId={purchase.id} cost={null} currency={currency} local={local} />
+            </EntityForm>
+          </div>
+        </div>
+      </section>
+
+      <section aria-labelledby="documents-heading" className="mt-10 max-w-3xl">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 id="documents-heading" className={sectionHeading}>
+            Documents
+          </h2>
+          <Link href="/admin/document-categories" className="inline-flex min-h-11 items-center text-sm font-semibold text-navy underline underline-offset-4">
+            Manage categories
+          </Link>
+        </div>
+        {documents.length === 0 ? (
+          <p className="mt-3 text-slate-600">No documents yet. Upload the invoice, packing list, bill of lading, bill of entry and bills below.</p>
+        ) : (
+          <div className="mt-3 space-y-6">
+            {documentGroups.map((group) => (
+              <div key={group.category?.id ?? "none"}>
+                <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-600">
+                  {group.category?.name ?? "No category"} <span className="font-normal normal-case">({group.documents.length})</span>
+                </h3>
+                <ul className="mt-2 space-y-3">
+                  {group.documents.map((document) => {
+                    const link = links.get(document.id);
+                    return (
+                      <li key={document.id} className={card}>
+                        <div className="flex flex-wrap items-start justify-between gap-2">
+                          <div className="min-w-0 [overflow-wrap:anywhere]">
+                            <p className="font-semibold text-slate-900">{document.title}</p>
+                            <p className="text-sm text-slate-600">
+                              {displayName(document.file_path)}
+                              {document.document_date ? ` · ${formatDate(document.document_date)}` : null}
+                            </p>
+                            {document.notes ? <p className="mt-1 whitespace-pre-line text-sm text-slate-700">{document.notes}</p> : null}
+                            {link ? (
+                              <a href={link.url} className="mt-1 inline-flex min-h-11 items-center text-sm font-semibold text-navy underline underline-offset-4">
+                                Download<span className="sr-only"> {document.title}</span>
+                              </a>
+                            ) : (
+                              <p className="mt-1 text-sm font-medium text-red-800">The file could not be found.</p>
+                            )}
+                          </div>
+                          <NoteDeleteButton id={document.id} action={deletePurchaseDocument} noun="document" />
+                        </div>
+                        <details className="mt-2">
+                          <summary className={editToggle}>Edit details</summary>
+                          <div className="mt-3">
+                            <EntityForm key={document.id} action={savePurchaseDocument} id={document.id} listHref={`/admin/purchases/${purchase.id}`}>
+                              <DocumentFields purchaseId={purchase.id} document={document} categories={categoryOptions} />
+                            </EntityForm>
+                          </div>
+                        </details>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="mt-6 rounded-lg border border-slate-200 bg-slate-50 p-4">
+          <h3 id="add-document-heading" className="font-semibold text-slate-900">
+            Add a document
+          </h3>
+          <div className="mt-4" role="region" aria-labelledby="add-document-heading">
+            <EntityForm
+              key={`document-${documents.length}-${documents.map((document) => document.id).join(",")}`}
+              action={savePurchaseDocument}
+              listHref={`/admin/purchases/${purchase.id}`}
+              submitLabel="Add document"
+            >
+              <DocumentFields purchaseId={purchase.id} document={null} categories={categoryOptions} />
             </EntityForm>
           </div>
         </div>
