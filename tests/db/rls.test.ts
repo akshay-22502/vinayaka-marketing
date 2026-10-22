@@ -808,8 +808,32 @@ describe("purchase documents", () => {
   });
 
   it("starts with the standard categories", async () => {
-    const { data } = await service.from("document_categories").select("name").in("name", ["Supplier invoice", "Packing list", "Bill of lading", "Other"]);
+    const { data } = await service.from("document_categories").select("name").in("name", ["Commercial invoice", "Packing list", "Bill of lading", "Other"]);
     expect(data).toHaveLength(4);
+  });
+
+  it("files a cost saved without a step under its kind's step, and refuses unknown steps", async () => {
+    const stepOf = async (kind: string) => {
+      const { data, error } = await service.from("purchase_costs").insert({ purchase_id: purchaseId, kind, amount: 1 }).select("stage").single();
+      expect(error).toBeNull();
+      return data?.stage;
+    };
+    expect(await stepOf("supplier_charges")).toBe("quotation");
+    expect(await stepOf("customs_duty")).toBe("port");
+    expect(await stepOf("transport")).toBe("delivery");
+    expect(await stepOf("bank_charges")).toBe("payment");
+    const bad = await service.from("purchase_costs").insert({ purchase_id: purchaseId, kind: "other", amount: 1, stage: "customs" });
+    expect(bad.error?.code).toBe("23514");
+    const badDocument = await service.from("purchase_documents").insert({ purchase_id: purchaseId, title: "x", file_path: `purchases/${purchaseId}/s.pdf`, stage: "customs" });
+    expect(badDocument.error?.code).toBe("23514");
+  });
+
+  it("keeps the step fields and rates in range", async () => {
+    const update = (row: Record<string, unknown>) => service.from("purchases").update(row).eq("id", purchaseId);
+    expect((await update({ status: "quotation", incoterm: "FOB", bank_rate: 86.4, inr_per_aed: 23.1 })).error).toBeNull();
+    expect((await update({ status: "delivered" })).error).toBeNull();
+    expect((await update({ incoterm: "XYZ" })).error?.code).toBe("23514");
+    expect((await update({ bank_rate: 0 })).error?.code).toBe("23514");
   });
 
   it("are hidden from visitors and signed-in non-admins, who cannot write them either", async () => {

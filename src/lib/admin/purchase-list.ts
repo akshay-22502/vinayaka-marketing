@@ -7,7 +7,7 @@ import { purchaseSums, type CostForSums, type ItemForSums } from "./purchases";
 // area, landed cost). Used by Admin > Purchases and by a supplier's page.
 
 export const PURCHASE_LIST_COLUMNS =
-  "id, supplier_id, reference, destination, status, order_date, currency, exchange_rate, container_type, container_count, suppliers(name)";
+  "id, supplier_id, reference, destination, status, order_date, currency, exchange_rate, bank_rate, container_type, container_count, suppliers(name)";
 
 export type PurchaseListRow = {
   id: string;
@@ -18,6 +18,7 @@ export type PurchaseListRow = {
   order_date: string | null;
   currency: string;
   exchange_rate: number | string;
+  bank_rate: number | string | null;
   container_type: string | null;
   container_count: number;
   suppliers: { name: string } | null;

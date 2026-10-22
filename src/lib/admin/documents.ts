@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { optionalDate } from "./purchases";
+import { PURCHASE_STEPS, optionalDate } from "./purchases";
 import { UUID_PATTERN, line, paragraphs } from "./schemas";
 import { displayName } from "./upload";
 
@@ -44,6 +44,9 @@ const optionalCategory = z
   .transform((value) => (value === "" ? null : value.toLowerCase()));
 
 const BAD_PURCHASE_MESSAGE = "This purchase could not be found. Reload the page.";
+
+/** The step of the purchase a document belongs to (hidden field of the step's form). */
+const step = z.enum(PURCHASE_STEPS, { error: "This step could not be found. Reload the page." }).default("quotation");
 export const CATEGORY_NAME_TAKEN_MESSAGE = "There is already a category with this name";
 export const DOCUMENT_FILE_MESSAGE = "Choose the file to upload";
 
@@ -51,6 +54,7 @@ export const DOCUMENT_FILE_MESSAGE = "Choose the file to upload";
 export const newDocumentSchema = z
   .object({
     purchase_id: id(BAD_PURCHASE_MESSAGE).transform((value) => value.toLowerCase()),
+    stage: step,
     category_id: optionalCategory,
     file_path: z.string({ error: DOCUMENT_FILE_MESSAGE }).trim().min(1, DOCUMENT_FILE_MESSAGE),
     title: line("Title", 200),
@@ -67,6 +71,7 @@ export const newDocumentSchema = z
 /** Changes to a document. The file itself stays: to replace it, delete the document and upload the new file. */
 export const documentUpdateSchema = z.object({
   purchase_id: id(BAD_PURCHASE_MESSAGE).transform((value) => value.toLowerCase()),
+  stage: step,
   category_id: optionalCategory,
   title: line("Title", 200).refine((value) => value !== "", "Enter a title"),
   document_date: optionalDate,

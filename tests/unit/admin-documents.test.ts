@@ -89,7 +89,7 @@ describe("document schemas", () => {
     const parsed = parseForm(newDocumentSchema, form({ purchase_id: PURCHASE_ID, file_path: FILE, category_id: "", document_date: "" }));
     expect(parsed).toEqual({
       ok: true,
-      data: { purchase_id: PURCHASE_ID, category_id: null, file_path: FILE, title: "commercial-invoice.pdf", document_date: null, notes: "" },
+      data: { purchase_id: PURCHASE_ID, stage: "quotation", category_id: null, file_path: FILE, title: "commercial-invoice.pdf", document_date: null, notes: "" },
     });
   });
 
@@ -110,10 +110,11 @@ describe("document schemas", () => {
       ok: false,
       errors: { title: "Enter a title" },
     });
-    expect(parseForm(documentUpdateSchema, form({ purchase_id: PURCHASE_ID, title: "Bill of entry", category_id: CATEGORY_ID, document_date: "2024-08-02" }))).toEqual({
+    expect(parseForm(documentUpdateSchema, form({ purchase_id: PURCHASE_ID, stage: "port", title: "Bill of entry", category_id: CATEGORY_ID, document_date: "2024-08-02" }))).toEqual({
       ok: true,
-      data: { purchase_id: PURCHASE_ID, category_id: CATEGORY_ID, title: "Bill of entry", document_date: "2024-08-02", notes: "" },
+      data: { purchase_id: PURCHASE_ID, stage: "port", category_id: CATEGORY_ID, title: "Bill of entry", document_date: "2024-08-02", notes: "" },
     });
+    expect(parseForm(documentUpdateSchema, form({ purchase_id: PURCHASE_ID, stage: "customs", title: "x" }))).toMatchObject({ ok: false });
   });
 
   it("reads a category's name and order", () => {
@@ -188,12 +189,15 @@ describe("document actions", () => {
 
   it("files a new document with its purchase", async () => {
     const { queries } = fakeSupabase();
-    const result = await savePurchaseDocument(null, form({ purchase_id: PURCHASE_ID, file_path: FILE, category_id: CATEGORY_ID, title: "Invoice AL240618" }));
+    const result = await savePurchaseDocument(
+      null,
+      form({ purchase_id: PURCHASE_ID, stage: "payment", file_path: FILE, category_id: CATEGORY_ID, title: "Bank advice" }),
+    );
     expect(result).toEqual({ ok: true });
     expect(queries[0].table).toBe("purchase_documents");
     expect(queries[0].ops[0]).toEqual({
       name: "insert",
-      args: [{ purchase_id: PURCHASE_ID, category_id: CATEGORY_ID, file_path: FILE, title: "Invoice AL240618", document_date: null, notes: "" }],
+      args: [{ purchase_id: PURCHASE_ID, stage: "payment", category_id: CATEGORY_ID, file_path: FILE, title: "Bank advice", document_date: null, notes: "" }],
     });
     expect(revalidatePath).toHaveBeenCalledWith(`/admin/purchases/${PURCHASE_ID}`);
   });
@@ -203,7 +207,7 @@ describe("document actions", () => {
     const result = await savePurchaseDocument(null, form({ id: DOCUMENT_ID, purchase_id: PURCHASE_ID, title: "Bill of entry", file_path: "purchases/x/evil.pdf" }));
     expect(result).toEqual({ ok: true });
     expect(opNames(queries[0])).toEqual(["update", "eq", "eq", "select"]);
-    expect(queries[0].ops[0].args[0]).toEqual({ category_id: null, title: "Bill of entry", document_date: null, notes: "" });
+    expect(queries[0].ops[0].args[0]).toEqual({ stage: "quotation", category_id: null, title: "Bill of entry", document_date: null, notes: "" });
     expect(queries[0].ops[2].args).toEqual(["purchase_id", PURCHASE_ID]);
   });
 
