@@ -237,6 +237,8 @@ Emails are sent from `TerraTechBharat <quotes@terratechbharat.com>`. That addres
 | `IP_HASH_SALT` | Invent a long random text. In a terminal: `openssl rand -hex 32`. Store it in your password manager | Production + Preview | **Secret**, server only |
 | `CRON_SECRET` | Invent another long random text (`openssl rand -hex 32`) and store it in your password manager. Vercel sends it with its daily keep-alive call (below); without it that call is refused | Production (cron jobs only run there; adding Preview is harmless) | **Secret**, server only |
 | `NEXT_GA_MEASUREMENT_ID` | Optional. Google Analytics 4 Measurement ID (`G-` then letters and digits), see "Google Analytics" below. Leave unset for no analytics | Production only (the tag is switched off on Preview anyway) | Public |
+| `GA_PROPERTY_ID` | Optional. The Google Analytics property **number** (Admin > Property details), for Admin > Analytics; see "Google Analytics in the admin panel" below | Production + Preview | Server only |
+| `GA_SERVICE_ACCOUNT_KEY` | Optional. The whole JSON key file of the service account that reads Analytics, see below | Production + Preview | **Secret**, server only |
 | `MAIL_FROM` | Optional. Leave unset to send from `TerraTechBharat <quotes@terratechbharat.com>` | Production + Preview | Server only |
 
 **Never add** `ALLOW_DEV_FALLBACKS` (it switches the captcha off and stops real emails; the site ignores it on Vercel, but do not add it) or `ADMIN_PASSWORD` (only used for one terminal command in step 9) to Vercel. `VERCEL`, `VERCEL_ENV` and `VERCEL_URL` are filled in by Vercel itself.
@@ -332,6 +334,18 @@ The site loads the Google Analytics 4 tag when `NEXT_GA_MEASUREMENT_ID` is set: 
 1. At [analytics.google.com](https://analytics.google.com), create an account and a **property** (time zone India, currency INR), then a **Web** data stream for `https://www.terratechbharat.com`. Keep **Enhanced measurement** on.
 2. Copy the stream's **Measurement ID** (`G-...`) to `NEXT_GA_MEASUREMENT_ID` in Vercel (Production) and **Redeploy**.
 3. After the first quote request, open **Admin > Events** (or **Key events**) in Google Analytics and mark `generate_lead` as a key event. Analytics can take up to a day to list a new event; **Reports > Realtime** shows visits within a minute.
+
+### Google Analytics in the admin panel (optional)
+
+**Admin > Analytics** shows visitors, visits, page views and quote requests for the last 7, 28 or 90 days, visitors per day, and the top pages, countries and traffic sources. It reads them from Google with a service account (a Google login for software) that only has Viewer access to the property. Until both variables are set, the page shows what is missing. Numbers are kept for 5 minutes.
+
+1. In [Google Cloud](https://console.cloud.google.com/projectcreate), with the Google account that owns Analytics, create a project (for example `terratech-analytics`).
+2. In that project, enable the [Google Analytics Data API](https://console.cloud.google.com/apis/library/analyticsdata.googleapis.com).
+3. Under [IAM & Admin > Service accounts](https://console.cloud.google.com/iam-admin/serviceaccounts), create a service account (for example `ga-reader`, no roles needed). Open it, then **Keys > Add key > Create new key > JSON**. A `.json` file downloads: treat it like a password.
+4. In Google Analytics, **Admin > Property access management > + > Add users**: add the service account's email (it ends in `iam.gserviceaccount.com`) with the **Viewer** role.
+5. In Vercel, add `GA_PROPERTY_ID` (Admin > Property details > Property ID, a number) and `GA_SERVICE_ACCOUNT_KEY` (the whole contents of the `.json` file), then **Redeploy**.
+
+If something is wrong, Admin > Analytics says which step to check. To stop access, delete the key in Google Cloud or remove the service account from the property.
 
 ## After launch: owner checklist
 
