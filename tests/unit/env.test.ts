@@ -9,6 +9,7 @@ beforeEach(() => {
   vi.stubEnv("VERCEL_ENV", "");
   vi.stubEnv("VERCEL_URL", "");
   vi.stubEnv("NODE_ENV", "test");
+  vi.stubEnv("NEXT_GA_MEASUREMENT_ID", "");
 });
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -180,5 +181,34 @@ describe("robots.txt rules", () => {
   it("is unchanged on Vercel Production", () => {
     vi.stubEnv("VERCEL_ENV", "production");
     expect(robots()).toMatchObject({ rules: { allow: "/" }, sitemap: "https://www.terratechbharat.com/sitemap.xml" });
+  });
+});
+
+describe("env.GA_MEASUREMENT_ID", () => {
+  it("is undefined when unset or blank, so the tag stays off", () => {
+    expect(env.GA_MEASUREMENT_ID).toBeUndefined();
+    vi.stubEnv("NEXT_GA_MEASUREMENT_ID", "   ");
+    expect(env.GA_MEASUREMENT_ID).toBeUndefined();
+  });
+
+  it("returns a GA4 ID, trimmed and upper-cased", () => {
+    vi.stubEnv("NEXT_GA_MEASUREMENT_ID", " g-abc123xyz9 ");
+    expect(env.GA_MEASUREMENT_ID).toBe("G-ABC123XYZ9");
+  });
+
+  it("ignores anything that is not a GA4 ID (an old UA- ID, a pasted snippet)", () => {
+    for (const value of ["UA-12345-1", "G-", "ABC123", "G-ABC123');alert(1);//", "<script>"]) {
+      vi.stubEnv("NEXT_GA_MEASUREMENT_ID", value);
+      expect(env.GA_MEASUREMENT_ID, value).toBeUndefined();
+    }
+  });
+
+  it("is off on Vercel Preview deployments, on in Production", () => {
+    vi.stubEnv("NEXT_GA_MEASUREMENT_ID", "G-ABC123XYZ9");
+    vi.stubEnv("VERCEL", "1");
+    vi.stubEnv("VERCEL_ENV", "preview");
+    expect(env.GA_MEASUREMENT_ID).toBeUndefined();
+    vi.stubEnv("VERCEL_ENV", "production");
+    expect(env.GA_MEASUREMENT_ID).toBe("G-ABC123XYZ9");
   });
 });

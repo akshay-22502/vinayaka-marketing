@@ -88,6 +88,19 @@ function turnstileSiteKey(): string | undefined {
   return process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim() || undefined;
 }
 
+/**
+ * The Google Analytics 4 Measurement ID (for example "G-ABC123XYZ9"), or undefined when the tag must
+ * stay off: the variable is unset, blank or not a GA4 ID, or this is a Vercel Preview (previews
+ * would count test visits as real traffic). Read where the page is rendered, so changing it on
+ * Vercel takes effect at the next deployment.
+ */
+function gaMeasurementId(): string | undefined {
+  if (isVercelPreview()) return undefined;
+  // Server-only (no NEXT_PUBLIC_ prefix): SiteFrame reads it while rendering and passes the ID down.
+  const id = process.env.NEXT_GA_MEASUREMENT_ID?.trim().toUpperCase();
+  return id && /^G-[A-Z0-9]{4,}$/.test(id) ? id : undefined;
+}
+
 export const env = {
   requireServerEnv,
   devFallbacksAllowed,
@@ -96,6 +109,9 @@ export const env = {
   },
   get NEXT_PUBLIC_TURNSTILE_SITE_KEY(): string | undefined {
     return turnstileSiteKey();
+  },
+  get GA_MEASUREMENT_ID(): string | undefined {
+    return gaMeasurementId();
   },
   isVercelPreview,
 };

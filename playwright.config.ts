@@ -28,6 +28,10 @@ export default defineConfig({
   use: {
     baseURL: `http://localhost:${PORT}`,
     trace: "on-first-retry",
+    // The E2E build has a made-up Google Analytics ID, so public pages ask for Google's gtag.js.
+    // Make that request fail at once instead of waiting on the network, which could hold up a
+    // page's load event; specs that look at the tag stub it (tests/support/gtag.ts).
+    launchOptions: { args: ["--host-resolver-rules=MAP www.googletagmanager.com ~NOTFOUND"] },
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {

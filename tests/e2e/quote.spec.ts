@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { stubGtag } from "../support/gtag";
 
 // The quote form (/quote and the contact page), against the seed. The server runs with
 // ALLOW_DEV_FALLBACKS=true and no Turnstile keys, so real submissions pass the captcha.
@@ -153,6 +154,8 @@ test.describe("opening the form", () => {
 
   for (const path of ["/quote", "/contact"]) {
     test(`${path} loads and works without console errors or hydration warnings`, async ({ page }) => {
+      // The analytics tag would otherwise try to reach Google, which the test machine cannot.
+      await stubGtag(page);
       const problems: string[] = [];
       page.on("pageerror", (error) => problems.push(`pageerror: ${error.message}`));
       page.on("console", (message) => {
