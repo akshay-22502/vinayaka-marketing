@@ -8,6 +8,7 @@ import {
   getCertifications,
   getNavVisibility,
   getProduct,
+  categoryOptions,
   getProductOptions,
   getProject,
   getProjects,
@@ -355,11 +356,14 @@ describe("getProductOptions", () => {
   it("lists published products in published categories only", async () => {
     const options = await getProductOptions();
     const mine = options.filter((o) => o.slug.startsWith(`t4-${run}-`));
-    expect(mine).toEqual([
+    expect(mine.map(({ slug, name }) => ({ slug, name }))).toEqual([
       { slug: slugs.main, name: "Zebra grid" },
       { slug: slugs.second, name: "Alpha grid" },
       { slug: slugs.toggle, name: "Toggled product" },
     ]);
+    // Each carries its category, which the quote form offers instead of the products.
+    expect(mine.every((o) => o.category.slug.startsWith(`t4-${run}-cat-`) && o.category.name !== "")).toBe(true);
+    expect(categoryOptions(mine).map((c) => c.slug)).toEqual([...new Set(mine.map((o) => o.category.slug))]);
   });
 });
 

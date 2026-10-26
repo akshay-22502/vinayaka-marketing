@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { QuoteForm } from "@/components/site/QuoteForm";
 import { SectionHeading } from "@/components/site/SectionHeading";
-import { getProductOptions } from "@/lib/content/queries";
+import { categoryOptions, getProductOptions } from "@/lib/content/queries";
 import { env } from "@/lib/env";
 import { pageMetadata } from "@/lib/seo";
 
 // Reading searchParams makes this page render per request. That is intended: the rest of the
-// site stays static, and the form needs the visitor's `?product=` choice.
+// site stays static, and the form needs the visitor's `?product=` or `?category=` choice.
 
 export const metadata = pageMetadata({
   title: "Request a quote",
@@ -15,16 +15,21 @@ export const metadata = pageMetadata({
   path: "/quote",
 });
 
-type Props = { searchParams: Promise<{ product?: string | string[] }> };
+type Props = { searchParams: Promise<{ product?: string | string[]; category?: string | string[] }> };
+
+const list = (value: string | string[] | undefined): string[] => (Array.isArray(value) ? value : value ? [value] : []);
 
 export default async function QuotePage({ searchParams }: Props) {
-  const [{ product }, options] = await Promise.all([searchParams, getProductOptions()]);
+  const [{ product, category }, products] = await Promise.all([searchParams, getProductOptions()]);
+  const options = categoryOptions(products);
 
-  // `?product=<slug>` ticks that product, but only when it is on offer: an unknown, unpublished or
-  // hidden slug opens the form with nothing ticked. `?product=a&product=b` ticks both.
-  const requested = Array.isArray(product) ? product : product ? [product] : [];
+  // The form offers categories. `?product=<slug>` (the quote button on a product page) ticks that
+  // product's category, and `?category=<slug>` ticks a category, but only when it is on offer: an
+  // unknown, unpublished or hidden slug opens the form with nothing ticked. Repeats tick each one.
+  const categoryOf = new Map(products.map((option) => [option.slug, option.category.slug]));
   const offered = new Set(options.map((option) => option.slug));
-  const preselected = [...new Set(requested)].filter((slug) => offered.has(slug));
+  const requested = [...list(product).map((slug) => categoryOf.get(slug)), ...list(category)];
+  const preselected = [...new Set(requested)].filter((slug): slug is string => slug !== undefined && offered.has(slug));
 
   return (
     <div className="container-page py-12 sm:py-16">

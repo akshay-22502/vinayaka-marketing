@@ -16,7 +16,7 @@ export const FIELD_ORDER = [
   "email",
   "phone",
   "country",
-  "products",
+  "categories",
   "quantity",
   "projectLocation",
   "message",
@@ -36,7 +36,7 @@ export const FIELD_LIMITS = {
   quantity: 200,
   projectLocation: 200,
   message: 5000,
-  products: 20,
+  categories: 20,
 } as const;
 
 export type QuoteFormValues = {
@@ -46,7 +46,8 @@ export type QuoteFormValues = {
   phone: string;
   /** "IN", "AE", or "" when none is chosen. */
   country: string;
-  products: string[];
+  /** Slugs of the ticked product categories. */
+  categories: string[];
   quantity: string;
   projectLocation: string;
   message: string;
@@ -93,8 +94,8 @@ export function checkQuoteForm(values: QuoteFormValues): FieldErrors {
 
   put("phone", checkRequired(values.phone, "Phone", "Enter your phone number", FIELD_LIMITS.phone));
   if (values.country !== "IN" && values.country !== "AE") put("country", "Choose India or the UAE");
-  if (values.products.length > FIELD_LIMITS.products) {
-    put("products", `Choose at most ${FIELD_LIMITS.products} products`);
+  if (values.categories.length > FIELD_LIMITS.categories) {
+    put("categories", `Choose at most ${FIELD_LIMITS.categories} categories`);
   }
   put("quantity", checkOptional(values.quantity, "Quantity", FIELD_LIMITS.quantity));
   put("projectLocation", checkOptional(values.projectLocation, "Project location", FIELD_LIMITS.projectLocation));

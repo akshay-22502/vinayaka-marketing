@@ -1,7 +1,7 @@
 import { OfficeDetails } from "@/components/site/OfficeDetails";
 import { QuoteForm } from "@/components/site/QuoteForm";
 import { SectionHeading } from "@/components/site/SectionHeading";
-import { getProductOptions, getSiteSettings } from "@/lib/content/queries";
+import { categoryOptions, getProductOptions, getSiteSettings } from "@/lib/content/queries";
 import { env } from "@/lib/env";
 import { pageMetadata } from "@/lib/seo";
 
@@ -15,7 +15,8 @@ export const metadata = pageMetadata({
 });
 
 export default async function ContactPage() {
-  const [settings, options] = await Promise.all([getSiteSettings(), getProductOptions()]);
+  const [settings, products] = await Promise.all([getSiteSettings(), getProductOptions()]);
+  const options = categoryOptions(products);
 
   return (
     <div className="container-page py-12 sm:py-16">

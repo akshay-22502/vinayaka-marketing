@@ -34,6 +34,7 @@ function newRequest(overrides: Partial<NewQuoteRequest> = {}): NewQuoteRequest {
     phone: "+91 90000 00000",
     country: "IN",
     products: [],
+    categories: [],
     quantity: "100 rolls",
     projectLocation: "Chennai",
     message: "Please quote",
@@ -87,7 +88,7 @@ afterAll(async () => {
 describe("insert", () => {
   it("saves a request with status 'new' and email_sent false, mapping every field", async () => {
     const { id } = await store.insert(
-      newRequest({ products: ["a-product", "another"], attachmentPath: "2026-10/x-plan.pdf" }),
+      newRequest({ products: ["a-product", "another"], categories: ["geogrid"], attachmentPath: "2026-10/x-plan.pdf" }),
     );
     expect(id).toMatch(/^[0-9a-f-]{36}$/);
 
@@ -100,6 +101,7 @@ describe("insert", () => {
       phone: "+91 90000 00000",
       country: "IN",
       products: ["a-product", "another"],
+      categories: ["geogrid"],
       quantity: "100 rolls",
       project_location: "Chennai",
       message: "Please quote",
@@ -214,6 +216,17 @@ describe("knownProductSlugs and productNames", () => {
 
   it("ignore repeated slugs", async () => {
     expect(await store.knownProductSlugs([s.shown, s.shown])).toEqual([s.shown]);
+  });
+});
+
+describe("listedCategories", () => {
+  it("returns only published categories, in the order asked, dropping unknown, repeated and odd slugs", async () => {
+    const asked = [s.catDraft, "no-such-category", s.cat, s.cat, 'a"),slug.eq.x'];
+    expect(await store.listedCategories(asked)).toEqual([{ slug: s.cat, name: "T8 category" }]);
+  });
+
+  it("answers an empty list without a query", async () => {
+    expect(await store.listedCategories([])).toEqual([]);
   });
 });
 

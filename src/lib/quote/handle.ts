@@ -52,6 +52,7 @@ function readFields(form: FormData): Record<string, unknown> {
     phone: text("phone"),
     country: text("country"),
     products: form.getAll("products").filter((value): value is string => typeof value === "string"),
+    categories: form.getAll("categories").filter((value): value is string => typeof value === "string"),
     quantity: text("quantity"),
     projectLocation: text("projectLocation"),
     message: text("message"),
@@ -121,6 +122,7 @@ export async function handleQuote(form: FormData, ip: string, deps: QuoteDeps): 
   const { store, mailer } = deps;
   let knownSlugs: string[];
   let productNames: string[];
+  let categories: Array<{ slug: string; name: string }>;
   let attachmentPath: string | null = null;
   let id: string;
 
@@ -140,6 +142,7 @@ export async function handleQuote(form: FormData, ip: string, deps: QuoteDeps): 
     // Unknown product slugs are dropped, not an error.
     knownSlugs = input.products.length > 0 ? await store.knownProductSlugs(input.products) : [];
     productNames = knownSlugs.length > 0 ? await store.productNames(knownSlugs) : [];
+    categories = input.categories.length > 0 ? await store.listedCategories(input.categories) : [];
 
     // 4. Save: the attachment first, then the row. This must come before any email.
     if (attachment) {
@@ -158,6 +161,7 @@ export async function handleQuote(form: FormData, ip: string, deps: QuoteDeps): 
       phone: input.phone,
       country: input.country,
       products: knownSlugs,
+      categories: categories.map((category) => category.slug),
       quantity: input.quantity ?? null,
       projectLocation: input.projectLocation ?? null,
       message: input.message,
@@ -170,6 +174,8 @@ export async function handleQuote(form: FormData, ip: string, deps: QuoteDeps): 
   }
 
   // 5. Emails. Nothing below can fail the request: the row is already saved.
+  // The emails list what the buyer asked about: the categories they ticked, then any products.
+  const wanted = [...categories.map((category) => category.name), ...productNames];
   let recipient: string | null = null;
   try {
     recipient = await store.recipientFor(input.country);
@@ -183,13 +189,13 @@ export async function handleQuote(form: FormData, ip: string, deps: QuoteDeps): 
     teamEmailSent = await trySend(mailer, "team", id, () => ({
       to,
       replyTo: input.email,
-      ...renderTeamEmail(input, productNames, id, { hasAttachment: attachmentPath !== null }),
+      ...renderTeamEmail(input, wanted, id, { hasAttachment: attachmentPath !== null }),
     }));
   } else {
     console.error(`[quote ${id}] no quote recipient is set for ${input.country}; the team was not emailed.`);
   }
 
-  await trySend(mailer, "buyer", id, () => ({ to: input.email, ...renderBuyerEmail(input, productNames, id) }));
+  await trySend(mailer, "buyer", id, () => ({ to: input.email, ...renderBuyerEmail(input, wanted, id) }));
 
   if (teamEmailSent) {
     try {

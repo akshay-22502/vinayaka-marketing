@@ -460,17 +460,20 @@ export async function getNavVisibility(): Promise<{ certifications: boolean; pro
 
 // Lists for forms and the sitemap --------------------------------------------------
 
-/** Products a visitor can pick on the quote form: grouped by category order, then product order. */
-export async function getProductOptions(): Promise<{ slug: string; name: string }[]> {
+/**
+ * Listed products (published, in a published category), grouped by category order, then product
+ * order, each with its category. The quote form offers the categories that have at least one.
+ */
+export async function getProductOptions(): Promise<{ slug: string; name: string; category: { slug: string; name: string } }[]> {
   const rows = await readRows<{
     slug: string;
     name: string;
     sort_order: number;
-    categories: { sort_order: number };
+    categories: { slug: string; name: string; sort_order: number };
   }>(
     getPublicClient()
       .from("products")
-      .select("slug, name, sort_order, categories!inner(slug, published, sort_order)")
+      .select("slug, name, sort_order, categories!inner(slug, name, published, sort_order)")
       .eq("published", true)
       .eq("categories.published", true),
     "product options",
@@ -480,7 +483,14 @@ export async function getProductOptions(): Promise<{ slug: string; name: string 
       (a, b) =>
         a.categories.sort_order - b.categories.sort_order || bySortOrderThenName(a, b),
     )
-    .map((row) => ({ slug: row.slug, name: row.name }));
+    .map((row) => ({ slug: row.slug, name: row.name, category: { slug: row.categories.slug, name: row.categories.name } }));
+}
+
+/** The categories among these product options, once each, in the options' (category) order. */
+export function categoryOptions(products: { category: { slug: string; name: string } }[]): { slug: string; name: string }[] {
+  const seen = new Map<string, string>();
+  for (const { category } of products) if (!seen.has(category.slug)) seen.set(category.slug, category.name);
+  return [...seen].map(([slug, name]) => ({ slug, name }));
 }
 
 type Dated = { slug: string; updated_at: string };

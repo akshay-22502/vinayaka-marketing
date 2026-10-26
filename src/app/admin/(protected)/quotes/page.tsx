@@ -27,12 +27,13 @@ type QuoteListRow = {
   company: string | null;
   country: Country;
   products: string[];
+  categories: string[];
   status: string;
   email_sent: boolean;
   created_at: string;
 };
 
-const LIST_COLUMNS = "id, name, company, country, products, status, email_sent, created_at";
+const LIST_COLUMNS = "id, name, company, country, products, categories, status, email_sent, created_at";
 
 const cell = "px-3 py-3 align-top text-sm text-slate-700";
 const headCell = "px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-slate-700";
@@ -59,19 +60,30 @@ function FilterLink({ href, active, children }: { href: string; active: boolean;
   );
 }
 
-/** Names for the product slugs on this page's requests. A failed lookup only means slugs are shown instead. */
+/** Names for the category and product slugs on this page's requests. A failed lookup only means slugs are shown instead. */
 async function productNames(
   supabase: Awaited<ReturnType<typeof requireAdmin>>["supabase"],
   rows: QuoteListRow[],
+): Promise<{ categories: Map<string, string>; products: Map<string, string> }> {
+  const [categories, products] = await Promise.all([
+    namesFrom(supabase, "categories", [...new Set(rows.flatMap((row) => row.categories))]),
+    namesFrom(supabase, "products", [...new Set(rows.flatMap((row) => row.products))]),
+  ]);
+  return { categories, products };
+}
+
+async function namesFrom(
+  supabase: Awaited<ReturnType<typeof requireAdmin>>["supabase"],
+  table: "categories" | "products",
+  slugs: string[],
 ): Promise<Map<string, string>> {
-  const slugs = [...new Set(rows.flatMap((row) => row.products))];
   if (slugs.length === 0) return new Map();
-  const { data, error } = await supabase.from("products").select("slug, name").in("slug", slugs);
+  const { data, error } = await supabase.from(table).select("slug, name").in("slug", slugs);
   if (error) {
-    console.error("Could not look up product names for the quote list", error);
+    console.error(`Could not look up ${table} names for the quote list`, error);
     return new Map();
   }
-  return new Map((data ?? []).map((product) => [product.slug as string, product.name as string]));
+  return new Map((data ?? []).map((item) => [item.slug as string, item.name as string]));
 }
 
 export default async function QuotesPage({ searchParams }: Props) {
@@ -173,7 +185,7 @@ export default async function QuotesPage({ searchParams }: Props) {
               </thead>
               <tbody className="divide-y divide-slate-200 bg-white">
                 {rows.map((row) => {
-                  const products = productLabels(row.products, names);
+                  const products = [...productLabels(row.categories, names.categories), ...productLabels(row.products, names.products)];
                   return (
                     <tr key={row.id} className="hover:bg-slate-50">
                       <td className={`${cell} min-w-0 [overflow-wrap:anywhere]`}>

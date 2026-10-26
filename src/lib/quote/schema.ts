@@ -7,7 +7,8 @@ import type { Country } from "@/lib/content/types";
 const REQUIRED_MIN = 2;
 const MESSAGE_MAX = 5000;
 const PRODUCTS_MAX = 20;
-/** Longest product slug kept; longer ones cannot be real and are dropped like unknown slugs. */
+const CATEGORIES_MAX = 20;
+/** Longest product or category slug kept; longer ones cannot be real and are dropped like unknown slugs. */
 export const PRODUCT_SLUG_MAX = 100;
 
 const COUNTRIES = ["IN", "AE"] as const satisfies readonly Country[];
@@ -44,6 +45,14 @@ export const quoteSchema = z.object({
   products: z
     .array(z.string())
     .max(PRODUCTS_MAX, `Choose at most ${PRODUCTS_MAX} products`)
+    .transform((slugs) => [
+      ...new Set(slugs.map((slug) => slug.trim()).filter((slug) => slug && slug.length <= PRODUCT_SLUG_MAX)),
+    ])
+    .default([]),
+  // Category slugs, the choices the form shows. Unknown ones are dropped later, like products.
+  categories: z
+    .array(z.string())
+    .max(CATEGORIES_MAX, `Choose at most ${CATEGORIES_MAX} categories`)
     .transform((slugs) => [
       ...new Set(slugs.map((slug) => slug.trim()).filter((slug) => slug && slug.length <= PRODUCT_SLUG_MAX)),
     ])

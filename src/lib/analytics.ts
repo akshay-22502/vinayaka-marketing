@@ -16,9 +16,9 @@ declare global {
 export const QUOTE_REQUEST_EVENT = "generate_lead";
 
 /**
- * Reports a quote request that the server accepted. Only the country and how many products were
- * ticked are sent: never the visitor's name, email, phone or message (Google's terms forbid
- * personal data in Analytics).
+ * Reports a quote request that the server accepted. Only the country and how many product categories
+ * were ticked are sent (as `product_count`, the name earlier reports use): never the visitor's name,
+ * email, phone or message (Google's terms forbid personal data in Analytics).
  */
 export function trackQuoteRequest(country: Country, productCount: number): void {
   if (typeof window === "undefined" || typeof window.gtag !== "function") return;

@@ -52,7 +52,7 @@ async function expectNoHorizontalScroll(page: Page): Promise<void> {
 
 const field = (page: Page, label: string): Locator => page.getByLabel(label, { exact: true });
 const submitButton = (page: Page): Locator => page.getByRole("button", { name: /^(Send request|Sending)/ });
-const checkedProducts = (page: Page): Locator => page.locator('input[name="products"]:checked');
+const checkedCategories = (page: Page): Locator => page.locator('input[name="categories"]:checked');
 /** The form's own alert region (Next also has an empty one for route changes). */
 const formAlert = (page: Page): Locator => page.getByRole("alert").filter({ hasText: /\S/ });
 
@@ -75,27 +75,34 @@ async function mockQuote(page: Page, status: number, body: unknown): Promise<{ c
 }
 
 test.describe("opening the form", () => {
-  test("a product page's Request a quote opens /quote with that product checked", async ({ page }) => {
+  test("a product page's Request a quote opens /quote with that product's category checked", async ({ page }) => {
     await page.goto(PRODUCT_PATH);
     await page.getByRole("main").getByRole("link", { name: "Request a quote" }).click();
 
     await expect(page).toHaveURL(/\/quote\?product=pp-biaxial-geogrid$/);
     await expect(page.getByRole("heading", { level: 1, name: "Request a quote" })).toBeVisible();
-    await expect(page.getByRole("checkbox", { name: "PP Biaxial Geogrid" })).toBeChecked();
-    await expect(checkedProducts(page)).toHaveCount(1);
-    // The other published products are offered, unchecked.
-    await expect(page.getByRole("checkbox", { name: "HDPE Geomembrane" })).not.toBeChecked();
+    await expect(page.getByRole("checkbox", { name: "Geogrid" })).toBeChecked();
+    await expect(checkedCategories(page)).toHaveCount(1);
+    // The form offers categories, not single products; the others are unchecked.
+    await expect(page.getByRole("checkbox", { name: "Geomembrane" })).not.toBeChecked();
+    await expect(page.getByRole("checkbox", { name: "PP Biaxial Geogrid" })).toHaveCount(0);
+  });
+
+  test("a category parameter checks that category", async ({ page }) => {
+    await page.goto("/quote?category=geomembrane&category=nope");
+    await expect(checkedCategories(page)).toHaveCount(1);
+    await expect(page.getByRole("checkbox", { name: "Geomembrane" })).toBeChecked();
   });
 
   test("an unknown product slug opens the form with nothing checked", async ({ page }) => {
     const response = await page.goto("/quote?product=does-not-exist");
     expect(response?.status()).toBe(200);
     await expect(page.getByRole("heading", { level: 1, name: "Request a quote" })).toBeVisible();
-    await expect(page.locator('input[name="products"]')).not.toHaveCount(0);
-    await expect(checkedProducts(page)).toHaveCount(0);
+    await expect(page.locator('input[name="categories"]')).not.toHaveCount(0);
+    await expect(checkedCategories(page)).toHaveCount(0);
   });
 
-  test("an unpublished product's slug is not pre-selected, and the product is not offered", async ({ page }) => {
+  test("an unpublished product's slug checks nothing", async ({ page }) => {
     const db = service();
     const slug = `e2e-hidden-${RUN}`;
     const category = await db.from("categories").select("id").eq("slug", "geogrid").single();
@@ -107,18 +114,17 @@ test.describe("opening the form", () => {
     try {
       await page.goto(`/quote?product=${slug}`);
       await expect(page.getByRole("heading", { level: 1, name: "Request a quote" })).toBeVisible();
-      await expect(checkedProducts(page)).toHaveCount(0);
-      await expect(page.getByRole("checkbox", { name: "E2E Hidden Product" })).toHaveCount(0);
+      await expect(checkedCategories(page)).toHaveCount(0);
     } finally {
       await db.from("products").delete().eq("slug", slug);
     }
   });
 
-  test("several product parameters are all pre-selected, and unknown ones are ignored", async ({ page }) => {
+  test("several product parameters check each one's category, and unknown ones are ignored", async ({ page }) => {
     await page.goto("/quote?product=hdpe-geomembrane&product=nope&product=pp-biaxial-geogrid");
-    await expect(checkedProducts(page)).toHaveCount(2);
-    await expect(page.getByRole("checkbox", { name: "HDPE Geomembrane" })).toBeChecked();
-    await expect(page.getByRole("checkbox", { name: "PP Biaxial Geogrid" })).toBeChecked();
+    await expect(checkedCategories(page)).toHaveCount(2);
+    await expect(page.getByRole("checkbox", { name: "Geomembrane" })).toBeChecked();
+    await expect(page.getByRole("checkbox", { name: "Geogrid" })).toBeChecked();
   });
 
   test("has a title, one h1, a labelled form and no floating quote button", async ({ page }) => {
@@ -183,7 +189,7 @@ test.describe("sending a request", () => {
     await field(page, "Company (optional)").fill("Gulf Canals LLC");
     await field(page, "Quantity (optional)").fill("12,000 m2");
     await field(page, "Project location (optional)").fill("Al Ain, UAE");
-    await page.getByRole("checkbox", { name: "HDPE Geomembrane" }).check();
+    await page.getByRole("checkbox", { name: "Geomembrane" }).check();
 
     await submitButton(page).click();
 
@@ -207,7 +213,8 @@ test.describe("sending a request", () => {
       status: "new",
       attachment_path: null,
     });
-    expect([...row.data!.products].sort()).toEqual(["hdpe-geomembrane", "pp-biaxial-geogrid"]);
+    expect([...row.data!.categories].sort()).toEqual(["geogrid", "geomembrane"]);
+    expect(row.data!.products).toEqual([]);
   });
 
   test("the contact page embeds the form: an India request with an attachment is saved with the file", async ({ page }) => {
@@ -220,7 +227,7 @@ test.describe("sending a request", () => {
     await expect(main.getByRole("heading", { level: 2, name: "Request a quote" })).toBeVisible();
     await expect(main.getByRole("link", { name: "Request a quote" })).toHaveCount(0);
     await expect(main.getByRole("form", { name: "Quote request" })).toBeVisible();
-    await expect(checkedProducts(page)).toHaveCount(0);
+    await expect(checkedCategories(page)).toHaveCount(0);
 
     await fillRequired(page, "india", { country: "India" });
     await field(page, "Attachment (optional)").setInputFiles({
@@ -233,10 +240,11 @@ test.describe("sending a request", () => {
     await expect(page.getByRole("heading", { level: 2, name: /Thank you.*India team/ })).toBeFocused();
 
     const db = service();
-    const row = await db.from("quote_requests").select("country, attachment_path, products").eq("email", buyerEmail("india")).single();
+    const row = await db.from("quote_requests").select("country, attachment_path, products, categories").eq("email", buyerEmail("india")).single();
     expect(row.error).toBeNull();
     expect(row.data!.country).toBe("IN");
     expect(row.data!.products).toEqual([]);
+    expect(row.data!.categories).toEqual([]);
     expect(row.data!.attachment_path).toMatch(/\.pdf$/);
     const file = await db.storage.from("quote-attachments").download(row.data!.attachment_path as string);
     expect(file.error).toBeNull();
@@ -488,7 +496,7 @@ test.describe("at 375px wide", () => {
     expect(name!.height).toBeGreaterThanOrEqual(44);
     const button = await submitButton(page).boundingBox();
     expect(button!.height).toBeGreaterThanOrEqual(44);
-    const product = await page.getByRole("checkbox", { name: "PP Biaxial Geogrid" }).locator("xpath=ancestor::label").boundingBox();
+    const product = await page.getByRole("checkbox", { name: "Geogrid" }).locator("xpath=ancestor::label").boundingBox();
     expect(product!.height).toBeGreaterThanOrEqual(44);
   });
 });

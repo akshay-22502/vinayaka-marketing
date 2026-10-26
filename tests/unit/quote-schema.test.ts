@@ -71,6 +71,14 @@ describe("quoteSchema", () => {
     expect(quoteSchema.parse({ ...valid, products: ["a", " a ", "", "b"] }).products).toEqual(["a", "b"]);
   });
 
+  it("allows up to 20 category slugs, drops blanks and repeats, and rejects more", () => {
+    const slugs = Array.from({ length: 20 }, (_, i) => `category-${i}`);
+    expect(quoteSchema.parse({ ...valid, categories: slugs }).categories).toHaveLength(20);
+    expect(errorFields({ ...valid, categories: [...slugs, "one-more"] })).toEqual(["categories"]);
+    expect(quoteSchema.parse({ ...valid, categories: ["a", " a ", "", "b"] }).categories).toEqual(["a", "b"]);
+    expect(quoteSchema.parse(valid).categories).toEqual([]);
+  });
+
   it("caps each product slug at 100 characters, dropping longer ones like unknown slugs", () => {
     const ok = "a".repeat(100);
     const tooLong = "b".repeat(101);

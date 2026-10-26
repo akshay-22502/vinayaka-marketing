@@ -9,6 +9,7 @@ const quote: QuoteInput = {
   phone: "+91 98765 43210",
   country: "IN",
   products: ["pp-biaxial-geogrid", "hdpe-geomembrane"],
+  categories: [],
   quantity: "5,000 m2",
   projectLocation: "Pune, Maharashtra",
   message: "Need a quote for a road base.\nSecond line.",
