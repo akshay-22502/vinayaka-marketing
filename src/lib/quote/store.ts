@@ -13,6 +13,8 @@ export interface NewQuoteRequest {
   country: Country;
   /** Slugs of products that exist and are listed on the site. */
   products: string[];
+  /** Slugs of categories that exist and are listed on the site. */
+  categories: string[];
   quantity: string | null;
   projectLocation: string | null;
   message: string;
@@ -34,12 +36,14 @@ export interface QuoteStore {
   productNames(slugs: string[]): Promise<string[]>;
   /** The slugs among these that are listed products, in the order asked. */
   knownProductSlugs(slugs: string[]): Promise<string[]>;
+  /** The listed (published) categories among these slugs, in the order asked; unknown slugs are dropped. */
+  listedCategories(slugs: string[]): Promise<Array<{ slug: string; name: string }>>;
   markEmailSent(id: string): Promise<void>;
 }
 
 const BUCKET = "quote-attachments";
 
-/** Only strings shaped like a product slug are ever put in a query. */
+/** Only strings shaped like a product or category slug are ever put in a query. */
 const SLUG_SHAPE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 const FILE_BASE_MAX = 80;
@@ -73,6 +77,18 @@ export function createSupabaseQuoteStore(client: SupabaseClient): QuoteStore {
     return wanted.flatMap((slug) => (bySlug.has(slug) ? [{ slug, name: bySlug.get(slug)! }] : []));
   }
 
+  /** Published categories among the given slugs. */
+  async function listedCategories(slugs: string[]): Promise<Array<{ slug: string; name: string }>> {
+    const wanted = [...new Set(slugs.filter((slug) => slug.length <= PRODUCT_SLUG_MAX && SLUG_SHAPE.test(slug)))];
+    if (wanted.length === 0) return [];
+
+    const { data, error } = await client.from("categories").select("slug, name").in("slug", wanted).eq("published", true);
+    if (error) fail("Could not look up categories", error);
+
+    const bySlug = new Map((data ?? []).map((row) => [row.slug as string, row.name as string]));
+    return wanted.flatMap((slug) => (bySlug.has(slug) ? [{ slug, name: bySlug.get(slug)! }] : []));
+  }
+
   return {
     async countSince(ipHash, since) {
       const { count, error } = await client
@@ -94,6 +110,7 @@ export function createSupabaseQuoteStore(client: SupabaseClient): QuoteStore {
           phone: row.phone,
           country: row.country,
           products: row.products,
+          categories: row.categories,
           quantity: row.quantity,
           project_location: row.projectLocation,
           message: row.message,
@@ -142,6 +159,8 @@ export function createSupabaseQuoteStore(client: SupabaseClient): QuoteStore {
     async knownProductSlugs(slugs) {
       return (await listedProducts(slugs)).map((product) => product.slug);
     },
+
+    listedCategories,
 
     async markEmailSent(id) {
       const { error } = await client.from("quote_requests").update({ email_sent: true }).eq("id", id);

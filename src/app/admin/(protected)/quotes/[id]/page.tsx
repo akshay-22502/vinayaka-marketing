@@ -31,6 +31,7 @@ type QuoteRow = {
   phone: string;
   country: Country;
   products: string[];
+  categories: string[];
   quantity: string | null;
   project_location: string | null;
   message: string;
@@ -44,7 +45,7 @@ type QuoteRow = {
 
 // Not ip_hash: the admin has no use for it.
 const COLUMNS =
-  "id, name, company, email, phone, country, products, quantity, project_location, message, attachment_path, status, admin_notes, email_sent, created_at, updated_at";
+  "id, name, company, email, phone, country, products, categories, quantity, project_location, message, attachment_path, status, admin_notes, email_sent, created_at, updated_at";
 
 type Attachment =
   | { kind: "none" }
@@ -66,15 +67,15 @@ async function attachmentFor(supabase: SupabaseClient, path: string | null): Pro
   return /^https?:\/\//i.test(data.signedUrl) ? { kind: "link", name, url: data.signedUrl } : { kind: "unavailable", name };
 }
 
-/** Names for the product slugs on the request. A failed lookup only means the slugs are shown instead. */
-async function namesFor(supabase: SupabaseClient, slugs: string[]): Promise<Map<string, string>> {
+/** Names for the category or product slugs on the request. A failed lookup only means the slugs are shown instead. */
+async function namesFor(supabase: SupabaseClient, table: "categories" | "products", slugs: string[]): Promise<Map<string, string>> {
   if (slugs.length === 0) return new Map();
-  const { data, error } = await supabase.from("products").select("slug, name").in("slug", slugs);
+  const { data, error } = await supabase.from(table).select("slug, name").in("slug", slugs);
   if (error) {
-    console.error("Could not look up product names for a quote request", error);
+    console.error(`Could not look up ${table} names for a quote request`, error);
     return new Map();
   }
-  return new Map((data ?? []).map((product) => [product.slug as string, product.name as string]));
+  return new Map((data ?? []).map((item) => [item.slug as string, item.name as string]));
 }
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
@@ -99,8 +100,13 @@ export default async function QuotePage({ params }: Props) {
   if (!data) notFound();
   const quote = data as QuoteRow;
 
-  const [attachment, names] = await Promise.all([attachmentFor(supabase, quote.attachment_path), namesFor(supabase, quote.products)]);
-  const products = productLabels(quote.products, names);
+  const [attachment, categoryNames, productNames] = await Promise.all([
+    attachmentFor(supabase, quote.attachment_path),
+    namesFor(supabase, "categories", quote.categories),
+    namesFor(supabase, "products", quote.products),
+  ]);
+  // The categories the buyer ticked, then any single products (older requests, or other API callers).
+  const products = [...productLabels(quote.categories, categoryNames), ...productLabels(quote.products, productNames)];
   const mailto = safeMailto(quote.email);
   const tel = telHref(quote.phone);
   const where = countryName(quote.country);

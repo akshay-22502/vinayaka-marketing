@@ -634,8 +634,8 @@ describe("database guards", () => {
     const { rows } = await db.query<{ tablename: string; rowsecurity: boolean }>(publicTables);
     expect(rows.map((row) => row.tablename).sort()).toEqual(
       [
-        "admins", "applications", "categories", "certifications", "product_applications",
-        "products", "project_products", "projects", "purchase_costs", "purchase_items", "purchases",
+        "admins", "applications", "categories", "certifications", "document_categories", "product_applications",
+        "products", "project_products", "projects", "purchase_costs", "purchase_documents", "purchase_items", "purchases",
         "quote_recipients", "quote_requests", "site_settings", "spec_models", "spec_properties", "spec_values",
         "suppliers", "wholesale_buyer_notes", "wholesale_buyers",
       ],

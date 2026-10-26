@@ -30,6 +30,11 @@ const PRODUCT_NAMES: Record<string, string> = {
   "hdpe-geomembrane": "HDPE Geomembrane",
 };
 
+const CATEGORY_NAMES: Record<string, string> = {
+  geogrid: "Geogrid",
+  geomembrane: "Geomembrane",
+};
+
 type Overrides = {
   store?: Partial<QuoteStore>;
   mailer?: Partial<Mailer>;
@@ -61,6 +66,9 @@ function setup(overrides: Overrides = {}) {
     knownProductSlugs: vi.fn(async (slugs: string[]) => slugs.filter((s) => s in PRODUCT_NAMES)),
     productNames: vi.fn(async (slugs: string[]) =>
       slugs.filter((s) => s in PRODUCT_NAMES).map((s) => PRODUCT_NAMES[s]!),
+    ),
+    listedCategories: vi.fn(async (slugs: string[]) =>
+      slugs.filter((s) => s in CATEGORY_NAMES).map((slug) => ({ slug, name: CATEGORY_NAMES[slug]! })),
     ),
     markEmailSent: vi.fn(async () => {
       calls.push("markEmailSent");
@@ -105,6 +113,7 @@ describe("handleQuote: the happy path", () => {
       phone: "+91 98765 43210",
       country: "IN",
       products: ["pp-biaxial-geogrid"],
+      categories: [],
       quantity: "5,000 m2",
       projectLocation: "Pune, Maharashtra",
       message: "Please quote for a road base reinforcement project.",
@@ -509,6 +518,34 @@ describe("handleQuote: products", () => {
     const result = await handleQuote(quoteForm({ products: ["ghost"] }), IP, deps);
     expect(result.status).toBe(200);
     expect(store.insert).toHaveBeenCalledWith(expect.objectContaining({ products: [] }));
+  });
+});
+
+describe("handleQuote: categories", () => {
+  it("stores the known categories, drops unknown ones, and lists them before any products in both emails", async () => {
+    const { deps, store, mailer } = setup();
+    const result = await handleQuote(
+      quoteForm({ categories: ["geomembrane", "no-such-category", "geogrid"], products: ["pp-biaxial-geogrid"] }),
+      IP,
+      deps,
+    );
+
+    expect(result.status).toBe(200);
+    expect(store.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ categories: ["geomembrane", "geogrid"], products: ["pp-biaxial-geogrid"] }),
+    );
+    const [team, buyer] = sent(mailer);
+    for (const email of [team!, buyer!]) {
+      expect(email.text).toMatch(/Geomembrane[\s\S]*Geogrid[\s\S]*PP Biaxial Geogrid/);
+      expect(email.html).not.toContain("no-such-category");
+    }
+  });
+
+  it("stores no categories when none are ticked", async () => {
+    const { deps, store } = setup();
+    await handleQuote(quoteForm(), IP, deps);
+    expect(store.insert).toHaveBeenCalledWith(expect.objectContaining({ categories: [] }));
+    expect(store.listedCategories).not.toHaveBeenCalled();
   });
 });
 

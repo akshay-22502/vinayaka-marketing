@@ -4,8 +4,8 @@ import { describe, expect, it } from "vitest";
 import { QuoteForm } from "@/components/site/QuoteForm";
 
 const options = [
-  { slug: "pp-biaxial-geogrid", name: "PP Biaxial Geogrid" },
-  { slug: "hdpe-geomembrane", name: "HDPE Geomembrane" },
+  { slug: "geogrid", name: "Geogrid" },
+  { slug: "geomembrane", name: "Geomembrane" },
 ];
 
 function render(props: { preselected?: string[]; siteKey?: string; options?: typeof options } = {}): string {
@@ -18,9 +18,9 @@ function render(props: { preselected?: string[]; siteKey?: string; options?: typ
   );
 }
 
-/** The `<input ...>` tag for a product checkbox. */
+/** The `<input ...>` tag for a category checkbox. */
 function checkbox(html: string, slug: string): string {
-  const tag = new RegExp(`<input[^>]*name="products"[^>]*value="${slug}"[^>]*>`).exec(html)?.[0];
+  const tag = new RegExp(`<input[^>]*name="categories"[^>]*value="${slug}"[^>]*>`).exec(html)?.[0];
   if (!tag) throw new Error(`no checkbox for ${slug}`);
   return tag;
 }
@@ -38,21 +38,27 @@ describe("QuoteForm", () => {
 
   it("uses the field names the quote API reads", () => {
     const html = render();
-    for (const name of ["name", "company", "email", "phone", "country", "products", "quantity", "projectLocation", "message", "attachment"]) {
+    for (const name of ["name", "company", "email", "phone", "country", "categories", "quantity", "projectLocation", "message", "attachment"]) {
       expect(html, name).toContain(`name="${name}"`);
     }
   });
 
-  it("ticks only the pre-selected products that are on offer", () => {
-    const html = render({ preselected: ["hdpe-geomembrane", "not-a-product"] });
-    expect(checkbox(html, "hdpe-geomembrane")).toContain("checked");
-    expect(checkbox(html, "pp-biaxial-geogrid")).not.toContain("checked");
-    expect(html).not.toContain("not-a-product");
+  it("offers categories, not single products", () => {
+    const html = render();
+    expect(html).toContain("Geogrid");
+    expect(html).not.toContain('name="products"');
   });
 
-  it("leaves out the product list when there are no products", () => {
+  it("ticks only the pre-selected categories that are on offer", () => {
+    const html = render({ preselected: ["geomembrane", "not-a-category"] });
+    expect(checkbox(html, "geomembrane")).toContain("checked");
+    expect(checkbox(html, "geogrid")).not.toContain("checked");
+    expect(html).not.toContain("not-a-category");
+  });
+
+  it("leaves out the category list when there are none", () => {
     const html = render({ options: [] });
-    expect(html).not.toContain('name="products"');
+    expect(html).not.toContain('name="categories"');
   });
 
   it("offers India and UAE as the only countries", () => {

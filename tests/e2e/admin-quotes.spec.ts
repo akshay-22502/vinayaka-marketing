@@ -366,9 +366,10 @@ test.describe("the inbox", () => {
     await expect(page.getByRole("heading", { level: 1, name: "Quote requests" })).toBeVisible();
     const row = rowOf(page, name);
     await expect(row).toBeVisible();
+    // The product page's quote button ticks its category, which the inbox lists by name.
     await expect(row).toContainText("Gulf Canals LLC");
     await expect(row).toContainText("UAE");
-    await expect(row).toContainText("PP Biaxial Geogrid");
+    await expect(row).toContainText("Geogrid");
     await expect(row).toContainText("New");
     await expect(row).toContainText(/\d{1,2} \w+ 20\d\d/);
     await expect(row).not.toContainText(NOT_SENT);

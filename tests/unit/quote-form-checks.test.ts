@@ -19,7 +19,7 @@ const valid: QuoteFormValues = {
   email: "asha@verma-infra.example",
   phone: "+91 98765 43210",
   country: "IN",
-  products: [],
+  categories: [],
   quantity: "",
   projectLocation: "",
   message: "Please quote for a road base reinforcement project.",
@@ -68,10 +68,10 @@ describe("checkQuoteForm", () => {
     expect(checkQuoteForm({ ...valid, phone: "1".repeat(51) }).phone).toMatch(/50/);
   });
 
-  it("allows at most 20 products", () => {
-    const slugs = (n: number) => Array.from({ length: n }, (_, i) => `product-${i}`);
-    expect(checkQuoteForm({ ...valid, products: slugs(20) })).toEqual({});
-    expect(checkQuoteForm({ ...valid, products: slugs(21) }).products).toMatch(/20/);
+  it("allows at most 20 categories", () => {
+    const slugs = (n: number) => Array.from({ length: n }, (_, i) => `category-${i}`);
+    expect(checkQuoteForm({ ...valid, categories: slugs(20) })).toEqual({});
+    expect(checkQuoteForm({ ...valid, categories: slugs(21) }).categories).toMatch(/20/);
   });
 
   it("checks the attachment", () => {
@@ -133,7 +133,7 @@ describe("firstInvalidField", () => {
   it("follows the order of the fields on the page, not the order the errors arrived in", () => {
     expect(FIELD_ORDER[0]).toBe("name");
     expect(firstInvalidField({ message: "x", email: "y", attachment: "z" })).toBe("email");
-    expect(firstInvalidField({ attachment: "z", products: "y" })).toBe("products");
+    expect(firstInvalidField({ attachment: "z", categories: "y" })).toBe("categories");
   });
 
   it("ignores keys that are not fields, and returns null when there are no errors", () => {

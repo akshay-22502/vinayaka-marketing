@@ -23,7 +23,7 @@ import { Turnstile, type TurnstileHandle } from "./Turnstile";
 type Option = { slug: string; name: string };
 
 type Props = {
-  /** Products a visitor can pick: published, in published categories. */
+  /** Product categories a visitor can pick: published, with at least one listed product. */
   options: Option[];
   /** Slugs to tick when the form opens. Slugs that are not in `options` are ignored. */
   preselected: string[];
@@ -170,7 +170,7 @@ function readValues(data: FormData): QuoteFormValues {
     email: text(data, "email"),
     phone: text(data, "phone"),
     country: text(data, "country"),
-    products: data.getAll("products").filter((value): value is string => typeof value === "string"),
+    categories: data.getAll("categories").filter((value): value is string => typeof value === "string"),
     quantity: text(data, "quantity"),
     projectLocation: text(data, "projectLocation"),
     message: text(data, "message"),
@@ -314,7 +314,7 @@ export function QuoteForm({ options, preselected, siteKey }: Props) {
     sending.current = false;
 
     if (outcome.kind === "sent") {
-      trackQuoteRequest(outcome.team, values.products.length);
+      trackQuoteRequest(outcome.team, values.categories.length);
       setTeam(outcome.team);
       setStatus("sent");
       return;
@@ -437,7 +437,7 @@ export function QuoteForm({ options, preselected, siteKey }: Props) {
 
           {options.length > 0 ? (
             <fieldset
-              aria-describedby={describedBy(`${prefix}-products-hint`, errors.products && `${prefix}-products-error`)}
+              aria-describedby={describedBy(`${prefix}-categories-hint`, errors.categories && `${prefix}-categories-error`)}
               className="min-w-0"
             >
               <legend className={labelClass}>
@@ -449,7 +449,7 @@ export function QuoteForm({ options, preselected, siteKey }: Props) {
                   <label key={option.slug} className={choiceClass}>
                     <input
                       type="checkbox"
-                      name="products"
+                      name="categories"
                       value={option.slug}
                       defaultChecked={selected.has(option.slug)}
                       className="size-5 shrink-0 accent-navy"
@@ -458,10 +458,10 @@ export function QuoteForm({ options, preselected, siteKey }: Props) {
                   </label>
                 ))}
               </div>
-              <p id={`${prefix}-products-hint`} className={hintClass}>
-                Tick everything you want a quote for.
+              <p id={`${prefix}-categories-hint`} className={hintClass}>
+                Tick everything you want a quote for. You can name exact products and grades in your message.
               </p>
-              <FieldError id={`${prefix}-products-error`} message={errors.products} />
+              <FieldError id={`${prefix}-categories-error`} message={errors.categories} />
             </fieldset>
           ) : null}
 
