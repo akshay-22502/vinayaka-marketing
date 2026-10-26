@@ -79,7 +79,7 @@ You need: **Node.js 22 or newer** (22.6+ is required because `create-admin` and 
    | `IP_HASH_SALT` | any text, for example `local` |
    | `ALLOW_DEV_FALLBACKS` | `true` (local only; the site ignores it on every Vercel deployment) |
 
-   Leave the Turnstile, Resend, `MAIL_FROM` and `CRON_SECRET` lines empty. `NEXT_PUBLIC_SITE_URL` can stay empty for `npm run dev`, but a local `npm run build` needs `NEXT_PUBLIC_SITE_URL=http://localhost:3000` in `.env.local` (production builds refuse to run without it). With `ALLOW_DEV_FALLBACKS=true` the captcha passes and emails are printed to the terminal instead of sent. Without that flag a missing Turnstile or Resend key makes `/api/quote` fail with a 500.
+   Leave the Turnstile, Resend, `MAIL_FROM` and `CRON_SECRET` lines empty. `NEXT_PUBLIC_SITE_URL` can stay empty for `npm run dev`, but a local `npm run build` needs `NEXT_PUBLIC_SITE_URL=http://localhost:3000` in `.env.local` (production builds refuse to run without it). With `ALLOW_DEV_FALLBACKS=true` the captcha passes and emails are printed to the terminal instead of sent. Without that flag a missing Turnstile secret makes `/api/quote` fail with a 500, and a missing Resend key only stops the emails: requests are still saved and show **Email not sent** in the admin inbox.
 
 3. Run the site:
 
@@ -215,7 +215,7 @@ The site was built and tested with the long `eyJ...` style keys (the "legacy" an
 3. Back in Resend click **Verify DNS Records**. Wait until the domain shows **Verified** (minutes to a few hours).
 4. Open **API Keys**, click **Create API Key**, give it **Sending access** for this domain, and copy the key (shown once) to `RESEND_API_KEY`.
 
-Emails are sent from `TerraTechBharat <quotes@terratechbharat.com>`. That address needs no mailbox; it only has to be on the verified domain. Until the domain is verified, quote emails fail (the quote is still saved).
+Emails are sent from `TerraTechBharat <quotes@terratechbharat.com>`. That address needs no mailbox; it only has to be on the verified domain. Until the domain is verified, or while `RESEND_API_KEY` is not set, quote emails fail but the quote is still saved and shows **Email not sent** in Admin > Quotes.
 
 ### 8. Import the project into Vercel and set the environment variables [browser]
 

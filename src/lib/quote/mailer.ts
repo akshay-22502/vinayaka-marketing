@@ -41,11 +41,22 @@ const consoleMailer: Mailer = {
 };
 
 /**
+ * Stands in when RESEND_API_KEY is not set on a real deployment: every send rejects, so the quote
+ * handler logs it and leaves the request saved with `email_sent` false ("Email not sent" in the
+ * admin inbox). A missing email key must never stop a buyer's request from being saved.
+ */
+const unconfiguredMailer: Mailer = {
+  async send() {
+    throw new Error("RESEND_API_KEY is not set, so no email was sent. See .env.example.");
+  },
+};
+
+/**
  * The mailer the quote API uses, built from the environment.
  *
- * With RESEND_API_KEY it sends through Resend, from MAIL_FROM. Without it, it
- * throws (the route answers 500 and logs it), unless ALLOW_DEV_FALLBACKS is
- * exactly "true", where it logs the email and counts it as sent.
+ * With RESEND_API_KEY it sends through Resend, from MAIL_FROM. Without it, every
+ * send fails (the request is still saved and shows "Email not sent"), unless
+ * ALLOW_DEV_FALLBACKS is exactly "true", where it logs the email and counts it as sent.
  *
  * `send` rejects when Resend refuses the email or does not answer within 8 seconds. (The Resend SDK returns errors
  * instead of throwing them; a rejection is what lets the caller see the failure.)
@@ -53,10 +64,7 @@ const consoleMailer: Mailer = {
 export function createMailer(): Mailer {
   const apiKey = process.env.RESEND_API_KEY?.trim();
   if (!apiKey) {
-    if (!env.devFallbacksAllowed()) {
-      throw new Error("Missing required environment variable RESEND_API_KEY. See .env.example.");
-    }
-    return consoleMailer;
+    return env.devFallbacksAllowed() ? consoleMailer : unconfiguredMailer;
   }
 
   const resend = new Resend(apiKey);
