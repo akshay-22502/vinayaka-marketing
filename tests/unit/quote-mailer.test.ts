@@ -113,11 +113,11 @@ describe("createMailer without a Resend key", () => {
     vi.stubEnv("RESEND_API_KEY", "");
   });
 
-  it("throws when fallbacks are not enabled", () => {
-    vi.stubEnv("ALLOW_DEV_FALLBACKS", "");
-    expect(() => createMailer()).toThrow(/RESEND_API_KEY/);
-    vi.stubEnv("ALLOW_DEV_FALLBACKS", "1");
-    expect(() => createMailer()).toThrow(/RESEND_API_KEY/);
+  it.each(["", "1"])("builds, but every send rejects, when ALLOW_DEV_FALLBACKS is %j", async (flag) => {
+    vi.stubEnv("ALLOW_DEV_FALLBACKS", flag);
+    const mailer = createMailer();
+    await expect(mailer.send(message)).rejects.toThrow(/RESEND_API_KEY/);
+    expect(resendConstructor).not.toHaveBeenCalled();
   });
 
   it("logs instead of sending when ALLOW_DEV_FALLBACKS is 'true', and counts as sent", async () => {
@@ -133,10 +133,12 @@ describe("createMailer without a Resend key", () => {
     expect(logged).toContain("Subject");
   });
 
-  it.each(["production", "preview"])("still throws on a Vercel %s deployment, even with the flag", (vercelEnv) => {
+  it.each(["production", "preview"])("still fails every send on a Vercel %s deployment, even with the flag", async (vercelEnv) => {
     vi.stubEnv("ALLOW_DEV_FALLBACKS", "true");
     vi.stubEnv("VERCEL", "1");
     vi.stubEnv("VERCEL_ENV", vercelEnv);
-    expect(() => createMailer()).toThrow(/RESEND_API_KEY/);
+    const log = vi.spyOn(console, "info").mockImplementation(() => {});
+    await expect(createMailer().send(message)).rejects.toThrow(/RESEND_API_KEY/);
+    expect(log).not.toHaveBeenCalled();
   });
 });

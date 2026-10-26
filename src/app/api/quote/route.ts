@@ -21,8 +21,9 @@ const MAX_BODY_BYTES = ATTACHMENT_MAX_BYTES + 512 * 1024;
 /**
  * Wires the real dependencies from the environment. Built per request (not at import)
  * so `next build` needs none of the secrets, and a missing one becomes a 500 for the
- * request that needs it. It throws for a missing secret, except the captcha secret and
- * the Resend key when ALLOW_DEV_FALLBACKS=true (see createCaptchaVerifier and createMailer).
+ * request that needs it. It throws for a missing secret, except the captcha secret when
+ * ALLOW_DEV_FALLBACKS=true (see createCaptchaVerifier) and the Resend key, whose absence
+ * only stops the emails (see createMailer).
  */
 function createDeps(): QuoteDeps {
   const salt = env.requireServerEnv("IP_HASH_SALT");

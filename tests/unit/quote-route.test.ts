@@ -51,7 +51,7 @@ describe("POST /api/quote configuration", () => {
     expect(body.errors).toHaveProperty("email");
   });
 
-  it.each(["TURNSTILE_SECRET_KEY", "RESEND_API_KEY", "IP_HASH_SALT", "SUPABASE_SERVICE_ROLE_KEY"])(
+  it.each(["TURNSTILE_SECRET_KEY", "IP_HASH_SALT", "SUPABASE_SERVICE_ROLE_KEY"])(
     "responds 500 with a logged error when %s is missing and fallbacks are off",
     async (name) => {
       vi.stubEnv(name, "");
@@ -64,6 +64,13 @@ describe("POST /api/quote configuration", () => {
       expect(JSON.stringify(vi.mocked(console.error).mock.calls)).toContain(name);
     },
   );
+
+  it("still handles a request when RESEND_API_KEY is missing: only the emails stop, the request is saved", async () => {
+    vi.stubEnv("RESEND_API_KEY", "");
+    const response = await POST(request());
+    expect(response.status).toBe(400);
+    expect((await response.json()).errors).toHaveProperty("email");
+  });
 
   describe("with ALLOW_DEV_FALLBACKS=true and no Turnstile secret or Resend key", () => {
     beforeEach(() => {
