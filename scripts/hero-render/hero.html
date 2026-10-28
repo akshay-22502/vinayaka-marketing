@@ -1,0 +1,16 @@
+<!doctype html><html><head><meta charset="utf-8">
+<style>
+html,body{margin:0;background:#000}
+#stage{position:relative;overflow:hidden;background:radial-gradient(ellipse 85% 75% at 50% 42%,#1e3766 0%,#0e1d3c 48%,#060c1a 100%)}
+#stage canvas{position:absolute;inset:0}
+</style>
+<script type="importmap">{"imports":{"three":"/node_modules/three/build/three.module.js","three/addons/":"/node_modules/three/examples/jsm/"}}</script>
+</head><body><div id="stage"></div>
+<script type="module">
+const q=new URLSearchParams(location.search);
+const st=document.getElementById('stage');
+st.style.width=(q.get('w')||1280)+'px'; st.style.height=(q.get('h')||720)+'px';
+const mod=await import('/scenes/hero.js');
+window.scene3d=await mod.default(st);
+window.ready=true;
+</script></body></html>

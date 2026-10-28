@@ -3,12 +3,12 @@ import { mainNavLinks } from "@/lib/nav";
 import { Logo } from "./Logo";
 import { MobileMenu } from "./MobileMenu";
 
-/** Navy header on every page: logo, main navigation and the Request a quote button. */
+/** Navy header on every page, pinned to the top with a frosted-glass background: logo, main navigation and the Request a quote button. */
 export function Header({ nav }: { nav: { certifications: boolean; projects: boolean } }) {
   const links = mainNavLinks(nav);
 
   return (
-    <header className="relative bg-navy text-white">
+    <header className="sticky top-0 z-40 border-b border-white/10 bg-navy/85 text-white backdrop-blur-xl backdrop-saturate-150">
       <div className="container-page flex h-16 items-center justify-between gap-3 lg:h-[72px]">
         <Logo priority large />
 
@@ -28,7 +28,7 @@ export function Header({ nav }: { nav: { certifications: boolean; projects: bool
         </nav>
 
         <div className="flex items-center gap-3">
-          <Link href="/quote" className="btn btn-primary hidden lg:inline-flex">
+          <Link href="/quote" className="btn btn-primary hidden rounded-full lg:inline-flex">
             Request a quote
           </Link>
           <MobileMenu links={links} />

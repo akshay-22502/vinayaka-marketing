@@ -1,4 +1,3 @@
-import { SectionHeading } from "../SectionHeading";
 import { revealProps } from "@/lib/reveal";
 
 const REASONS = [
@@ -20,22 +19,27 @@ const REASONS = [
   },
 ];
 
-/** Four short reasons to choose TerraTechBharat. */
+/** Four short reasons to choose TerraTechBharat, as tiles. */
 export function WhyUs() {
   return (
-    <section aria-labelledby="why-heading" className="container-page py-14 sm:py-20">
-      <div {...revealProps()}>
-        <SectionHeading id="why-heading" eyebrow="Why TerraTechBharat" title="Built for the people who specify and buy" />
+    <section aria-labelledby="why-heading" className="bg-[#f5f5f7] py-20 sm:py-28">
+      <div className="container-page">
+        <div {...revealProps()} className="max-w-3xl">
+          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-orange-dark">Why TerraTechBharat</p>
+          <h2 id="why-heading" className="mt-4 text-4xl font-semibold leading-[1.05] tracking-[-0.03em] text-navy sm:text-6xl">
+            Built for the people who specify and buy.
+          </h2>
+        </div>
+        <ul className="mt-12 grid gap-5 sm:grid-cols-2">
+          {REASONS.map((reason, index) => (
+            <li key={reason.title} {...revealProps(index)} className="rounded-[2rem] bg-white p-8 sm:p-10">
+              <span aria-hidden="true" className="reveal-bar block h-1 w-12 origin-left rounded-full bg-orange" />
+              <h3 className="mt-6 text-2xl font-semibold tracking-[-0.02em] text-navy">{reason.title}</h3>
+              <p className="mt-3 text-lg leading-relaxed text-slate-600">{reason.text}</p>
+            </li>
+          ))}
+        </ul>
       </div>
-      <ul className="mt-10 grid gap-x-8 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">
-        {REASONS.map((reason, index) => (
-          <li key={reason.title} {...revealProps(index)}>
-            <span aria-hidden="true" className="reveal-bar block h-1 origin-left bg-orange" />
-            <h3 className="mt-5 text-lg font-semibold text-navy">{reason.title}</h3>
-            <p className="mt-2 text-slate-600">{reason.text}</p>
-          </li>
-        ))}
-      </ul>
     </section>
   );
 }
