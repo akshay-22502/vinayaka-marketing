@@ -1,14 +1,18 @@
-# Home page hero frames
+# Scroll story frames
 
-The scroll sequence on the home page (src/components/site/home/ScrollHero.tsx) is a three.js scene
-(scenes/hero.js) rendered frame by frame in headless Chromium, then encoded to WebP.
+Each product line's scroll story (src/components/site/ScrollStory.tsx, copy in
+src/lib/scroll-stories.ts) plays frames rendered from a three.js scene in scenes/: geogrid (also the
+home page), geomembrane, geotextile and geocell. scenes/stage.js holds the shared lighting and
+camera; scenes/lib.js the textures, stones, sheets and grass.
 
     npm i                                   # three, in this folder only
     node server.cjs &                       # serves this folder on :4321
-    node shoot-hero.cjs 1280 720 72 out/land
-    node shoot-hero.cjs 720 1280 72 out/port
-    ./encode-hero.sh land 60 72 1280        # -> public/hero/land/000..071.webp
-    ./encode-hero.sh port 60 72 720         # -> public/hero/port/000..071.webp
+    ./render-all.sh                         # all four scenes, or name some: ./render-all.sh geocell
 
-`node shoot-hero.cjs 1280 720 stills out/s` renders a dozen test stills. Keep the frame counts in
-src/lib/hero-frames.ts in step. Each set takes about five minutes without a GPU.
+render-all.sh renders 72 landscape (1280x720) and 72 portrait (720x1280) frames per scene into out/
+and encodes them to public/hero/<scene>/<land|port>/000..071.webp. Test stills of one scene:
+
+    node shoot-hero.cjs 1280 720 stills out/test geomembrane
+
+If the repo's Playwright has no browser of its own, point CHROME_PATH at an installed Chromium.
+Keep the frame counts in src/lib/hero-frames.ts in step. A scene takes about five minutes without a GPU.

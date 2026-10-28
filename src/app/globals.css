@@ -93,6 +93,27 @@ html {
   }
 }
 
+/* Pinned on large screens (PinnedRail): the script slides the rail, so it does not scroll or clip
+   itself. Outside the layers so it wins over the rail's overflow utilities. */
+[data-rail-pinned] .rail {
+  overflow: visible;
+  scroll-snap-type: none;
+  will-change: transform;
+}
+
+/* Stacking product cards (components/site/home/StackMotion.tsx sets --cover and --enter). */
+@media (prefers-reduced-motion: no-preference) {
+  .stack-card {
+    transform: scale(calc(1 - var(--cover, 0) * 0.07));
+    transform-origin: 50% 0;
+    filter: brightness(calc(1 - var(--cover, 0) * 0.45));
+    will-change: transform, filter;
+  }
+  .stack-card-image {
+    transform: scale(calc(1.14 - var(--enter, 1) * 0.14));
+  }
+}
+
 /* Hero text rises in on load. */
 @media (prefers-reduced-motion: no-preference) {
   .rise-in {

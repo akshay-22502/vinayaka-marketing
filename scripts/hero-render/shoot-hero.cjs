@@ -1,13 +1,13 @@
-// node shoot-hero.cjs <w> <h> <frames|stills> <outdir>
+// node shoot-hero.cjs <w> <h> <frames|stills> <outdir> [scene]
 const { chromium } = require('playwright');
 const fs = require('fs');
 (async () => {
-  const [w, h, mode, out] = [+process.argv[2], +process.argv[3], process.argv[4], process.argv[5]];
-  const b = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+  const [w, h, mode, out, scene] = [+process.argv[2], +process.argv[3], process.argv[4], process.argv[5], process.argv[6] || 'geogrid'];
+  const b = await chromium.launch({ executablePath: process.env.CHROME_PATH || undefined, args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
   const p = await b.newPage({ viewport: { width: w, height: h } });
   p.on('pageerror', e => console.log('ERR', e.message));
   p.on('console', m => { if (m.type() === 'error') console.log('console', m.text()); });
-  await p.goto(`http://localhost:4321/hero.html?w=${w}&h=${h}`);
+  await p.goto(`http://localhost:4321/hero.html?scene=${scene}&w=${w}&h=${h}`);
   await p.waitForFunction(() => window.ready, null, { timeout: 120000 });
   const el = await p.$('#stage');
   fs.mkdirSync(out, { recursive: true });

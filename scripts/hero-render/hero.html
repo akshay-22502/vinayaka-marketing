@@ -10,7 +10,7 @@ html,body{margin:0;background:#000}
 const q=new URLSearchParams(location.search);
 const st=document.getElementById('stage');
 st.style.width=(q.get('w')||1280)+'px'; st.style.height=(q.get('h')||720)+'px';
-const mod=await import('/scenes/hero.js');
+const mod=await import('/scenes/'+(q.get('scene')||'geogrid')+'.js');
 window.scene3d=await mod.default(st);
 window.ready=true;
 </script></body></html>

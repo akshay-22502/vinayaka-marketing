@@ -1,57 +1,11 @@
 // Home page hero: a biaxial geogrid unrolls in the dark, the camera dives to a junction,
 // aggregate rains into the apertures, then the road section builds up around it.
-// render(p) takes scroll progress 0..1. Frame size comes from ?w=&h= on the page URL.
-import { THREE, RoundedBoxGeometry, MAT, slab, stones, ease, span, clamp01 } from "./lib.js";
-import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+// render(p) takes scroll progress 0..1.
+import { THREE, RoundedBoxGeometry, MAT, slab, stones, ease, span } from "./lib.js";
+import { makeStage } from "./stage.js";
 
 export default async function (stage) {
-  const q = new URLSearchParams(location.search);
-  const W = Number(q.get("w") || 1280);
-  const H = Number(q.get("h") || 720);
-  const portrait = H > W;
-
-  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
-  renderer.setPixelRatio(1);
-  renderer.setSize(W, H);
-  renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.15;
-  renderer.outputColorSpace = THREE.SRGBColorSpace;
-  stage.appendChild(renderer.domElement);
-
-  const scene = new THREE.Scene();
-  // Portrait frames keep about the same horizontal view, so the vertical field is wider.
-  const camera = new THREE.PerspectiveCamera(portrait ? 58 : 30, W / H, 0.01, 200);
-  // The page sets copy on the left (landscape) or at the top (portrait): move the subject clear of it.
-  if (portrait) camera.setViewOffset(W, H, 0, -0.16 * H, W, H);
-  else camera.setViewOffset(W, H, -0.13 * W, 0, W, H);
-  const pmrem = new THREE.PMREMGenerator(renderer);
-  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-  scene.environmentIntensity = 0.35;
-
-  scene.add(new THREE.HemisphereLight(0x9fb4e0, 0x10141c, 0.55));
-  const key = new THREE.DirectionalLight(0xfff6ec, 2.7);
-  key.position.set(-5, 10, 6);
-  key.castShadow = true;
-  key.shadow.mapSize.set(2048, 2048);
-  Object.assign(key.shadow.camera, { left: -7, right: 7, top: 7, bottom: -7, near: 1, far: 40 });
-  key.shadow.bias = -0.0003;
-  key.shadow.normalBias = 0.01;
-  scene.add(key);
-  // Warm brand-orange rim from behind, cool fill from the camera side.
-  const rim = new THREE.DirectionalLight(0xff8a3d, Number(new URLSearchParams(location.search).get("rim") ?? 1.3));
-  rim.position.set(6, 0.4, -8);
-  scene.add(rim);
-  const fill = new THREE.DirectionalLight(0x8fb0ff, 0.6);
-  fill.position.set(-2, 3, 10);
-  scene.add(fill);
-
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(80, 80), new THREE.ShadowMaterial({ opacity: 0.55 }));
-  floor.rotation.x = -Math.PI / 2;
-  floor.position.y = -0.002;
-  floor.receiveShadow = true;
-  scene.add(floor);
+  const { portrait, renderer, scene, camera, cameraPath } = makeStage(stage);
 
   // ---------- the geogrid ----------
   const X0 = -4, X1 = 4, Z0 = -2.4, Z1 = 2.4, P = 0.4;
@@ -217,26 +171,7 @@ export default async function (stage) {
         [0.82, [-7.4, 4.7, 10.5], [0.3, -0.45, 0]],
         [1.0, [-6.2, 4.1, 11.6], [0.6, -0.45, 0]],
       ];
-  const smooth = (x) => x * x * (3 - 2 * x);
-  const a = new THREE.Vector3(), b = new THREE.Vector3(), la = new THREE.Vector3(), lb = new THREE.Vector3();
-  function cameraAt(p) {
-    let k = 0;
-    while (k < L.length - 2 && p > L[k + 1][0]) k++;
-    const [p0, c0, l0] = L[k];
-    const [p1, c1, l1] = L[k + 1];
-    const u = smooth(clamp01((p - p0) / (p1 - p0)));
-    // Pull-back moves (big distance change) ease the distance in log space so the dive feels even.
-    a.set(...c0);
-    b.set(...c1);
-    la.set(...l0);
-    lb.set(...l1);
-    const look = la.clone().lerp(lb, u);
-    const d0 = a.clone().sub(la), d1 = b.clone().sub(lb);
-    const len = Math.exp(Math.log(d0.length()) * (1 - u) + Math.log(d1.length()) * u);
-    const dir = d0.normalize().lerp(d1.normalize(), u).normalize();
-    camera.position.copy(look).addScaledVector(dir, len);
-    camera.lookAt(look);
-  }
+  const cameraAt = cameraPath(L);
 
   function render(p) {
     cameraAt(p);
