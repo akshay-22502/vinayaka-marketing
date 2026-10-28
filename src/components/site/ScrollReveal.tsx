@@ -7,7 +7,7 @@ import { useEffect } from "react";
  * Plays the scroll animations (styles in globals.css):
  * - `[data-reveal]` elements fade and lift into place as they scroll into view. Only elements that
  *   start below the fold are hidden, so nothing visible on load blinks.
- * - `[data-scene]` drawings are held on their first frame, then play once half of one is in view.
+ * - `[data-play-in-view]` videos start playing once half of one is in view.
  * Nothing is hidden or held until this has run, so the page reads fine without JavaScript, and
  * nothing moves for people who ask for reduced motion. Runs again after each client navigation.
  */
@@ -23,10 +23,10 @@ export function ScrollReveal() {
         for (const entry of entries) {
           if (!entry.isIntersecting) continue;
           const element = entry.target;
-          if (element.hasAttribute("data-scene")) {
-            // Wait until half the drawing is on screen, so it is not over before anyone sees it.
+          if (element instanceof HTMLVideoElement) {
+            // Wait until half the clip is on screen, so it is not over before anyone sees it.
             if (entry.intersectionRatio < 0.5) continue;
-            element.setAttribute("data-scene-state", "play");
+            element.play().catch(() => {});
           } else {
             element.setAttribute("data-reveal", "shown");
           }
@@ -41,9 +41,8 @@ export function ScrollReveal() {
       element.setAttribute("data-reveal", "hidden");
       observer.observe(element);
     }
-    for (const element of document.querySelectorAll<HTMLElement>("[data-scene]:not([data-scene-state])")) {
-      element.setAttribute("data-scene-state", "ready");
-      observer.observe(element);
+    for (const element of document.querySelectorAll<HTMLVideoElement>("video[data-play-in-view]")) {
+      if (element.currentTime === 0) observer.observe(element);
     }
     return () => observer.disconnect();
   }, [pathname]);

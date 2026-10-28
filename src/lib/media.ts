@@ -41,11 +41,19 @@ export function productPlaceholder(productSlug: string, categorySlug: string): s
     : categoryPlaceholder(categorySlug);
 }
 
-/** Default cross-section drawing for an application without a photo. */
+/** Default 3D cross-section render for an application without a photo. */
 export function applicationPlaceholder(applicationSlug: string): string {
   return APPLICATION_IMAGES.has(applicationSlug)
     ? `/images/applications/${applicationSlug}.webp`
     : APPLICATION_PLACEHOLDER;
+}
+
+/**
+ * Short 3D clip of the application being built, for an application without a photo, or null.
+ * Its last frame is the default image, which doubles as the poster.
+ */
+export function applicationVideo(applicationSlug: string): string | null {
+  return APPLICATION_IMAGES.has(applicationSlug) ? `/videos/applications/${applicationSlug}.mp4` : null;
 }
 
 /** URL of a stored file, or `fallback` (a placeholder) when the entity has none. */
