@@ -9,6 +9,7 @@ import { Presence } from "@/components/site/home/Presence";
 import { ProjectsStrip } from "@/components/site/home/ProjectsStrip";
 import { WhyUs } from "@/components/site/home/WhyUs";
 import { QuoteCta } from "@/components/site/QuoteCta";
+import { ScrollReveal } from "@/components/site/ScrollReveal";
 import {
   getApplications,
   getCategories,
@@ -16,6 +17,7 @@ import {
   getProjects,
   getSiteSettings,
 } from "@/lib/content/queries";
+import { revealProps } from "@/lib/reveal";
 import { metaDescription, organizationJsonLd, pageMetadata } from "@/lib/seo";
 
 export const revalidate = 3600;
@@ -54,12 +56,13 @@ export default async function HomePage() {
       <CertificationsStrip certifications={certifications} />
       <ProjectsStrip projects={projects} />
       <Presence settings={settings} />
-      <div className="container-page py-14 sm:py-20">
+      <div {...revealProps()} className="container-page py-14 sm:py-20">
         <QuoteCta
           heading="Tell us about your project"
           text="Send your product needs, quantities and delivery location. We reply with recommendations and a quotation."
         />
       </div>
+      <ScrollReveal />
     </>
   );
 }

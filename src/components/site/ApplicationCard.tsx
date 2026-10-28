@@ -19,7 +19,7 @@ export function ApplicationCard({ application, headingLevel = 3 }: Props) {
         <CoverImage
           src={mediaOr(application.imagePath, applicationPlaceholder(application.slug))}
           alt=""
-          sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
+          sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw" className="motion-safe:transition-transform motion-safe:duration-500 motion-safe:group-hover:scale-105"
         />
       </div>
       <div className="p-5">
