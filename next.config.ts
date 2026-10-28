@@ -34,6 +34,12 @@ const nextConfig: NextConfig = {
         ],
       },
       {
+        // Scroll-story frames: without this Vercel revalidates every one of the 72 frames on each
+        // visit. They change only when re-rendered, so a day fresh and a week stale is safe.
+        source: "/hero/:path*",
+        headers: [{ key: "Cache-Control", value: "public, max-age=86400, stale-while-revalidate=604800" }],
+      },
+      {
         // The admin area (login included) must never show up in search results.
         source: "/admin/:path*",
         headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }],
