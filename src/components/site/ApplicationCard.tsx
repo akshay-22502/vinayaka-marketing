@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Application } from "@/lib/content/types";
-import { applicationPlaceholder, mediaOr } from "@/lib/media";
-import { ApplicationScene, hasApplicationScene } from "./ApplicationScene";
+import { applicationPlaceholder, applicationVideo, mediaOr } from "@/lib/media";
+import { ApplicationVideo } from "./ApplicationVideo";
 import { CoverImage } from "./CoverImage";
 
 type Props = {
@@ -13,13 +13,14 @@ type Props = {
 /** An application in a listing: photo (or its default drawing), name and summary. The whole card is one link. */
 export function ApplicationCard({ application, headingLevel = 3 }: Props) {
   const Heading = headingLevel === 2 ? "h2" : "h3";
+  const video = applicationVideo(application.slug);
 
   return (
     <article className="group relative flex h-full flex-col overflow-hidden rounded-xl border border-slate-200 bg-white transition-shadow hover:shadow-md has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-orange">
       <div className="relative aspect-[16/9] bg-slate-100">
-        {/* An uploaded photo wins; otherwise the animated drawing, else the default image. */}
-        {!application.imagePath && hasApplicationScene(application.slug) ? (
-          <ApplicationScene slug={application.slug} />
+        {/* An uploaded photo wins; otherwise the 3D clip, else the default image. */}
+        {!application.imagePath && video ? (
+          <ApplicationVideo src={video} poster={applicationPlaceholder(application.slug)} />
         ) : (
           <CoverImage
             src={mediaOr(application.imagePath, applicationPlaceholder(application.slug))}

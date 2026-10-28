@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { cache } from "react";
-import { ApplicationScene, hasApplicationScene } from "@/components/site/ApplicationScene";
+import { ApplicationVideo } from "@/components/site/ApplicationVideo";
 import { Breadcrumb } from "@/components/site/Breadcrumb";
 import { CoverImage } from "@/components/site/CoverImage";
 import { Markdown } from "@/components/site/Markdown";
@@ -9,7 +9,7 @@ import { ProductCard } from "@/components/site/ProductCard";
 import { QuoteCta } from "@/components/site/QuoteCta";
 import { SectionHeading } from "@/components/site/SectionHeading";
 import { getApplication, getApplications } from "@/lib/content/queries";
-import { applicationPlaceholder } from "@/lib/media";
+import { applicationPlaceholder, applicationVideo } from "@/lib/media";
 import { metaDescription, pageMetadata } from "@/lib/seo";
 import { publicMediaUrl } from "@/lib/storage";
 
@@ -45,6 +45,7 @@ export default async function ApplicationPage({ params }: Props) {
   if (!application) notFound();
 
   const photo = publicMediaUrl(application.imagePath);
+  const video = applicationVideo(application.slug);
 
   return (
     <div className="container-page py-8 sm:py-12">
@@ -59,9 +60,9 @@ export default async function ApplicationPage({ params }: Props) {
         <SectionHeading level={1} title={application.name} intro={application.summary} />
       </div>
 
-      <div className="relative mt-8 aspect-[16/9] overflow-hidden rounded-xl border border-slate-200 bg-slate-100 lg:aspect-[21/9]">
-        {!photo && hasApplicationScene(application.slug) ? (
-          <ApplicationScene slug={application.slug} />
+      <div className="relative mt-8 aspect-[16/9] overflow-hidden rounded-xl border border-slate-200 bg-slate-100 lg:max-w-4xl">
+        {!photo && video ? (
+          <ApplicationVideo src={video} poster={applicationPlaceholder(application.slug)} />
         ) : (
           <CoverImage
             src={photo ?? applicationPlaceholder(application.slug)}
