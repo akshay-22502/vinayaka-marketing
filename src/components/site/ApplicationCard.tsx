@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Application } from "@/lib/content/types";
 import { applicationPlaceholder, mediaOr } from "@/lib/media";
+import { ApplicationScene, hasApplicationScene } from "./ApplicationScene";
 import { CoverImage } from "./CoverImage";
 
 type Props = {
@@ -16,11 +17,17 @@ export function ApplicationCard({ application, headingLevel = 3 }: Props) {
   return (
     <article className="group relative flex h-full flex-col overflow-hidden rounded-xl border border-slate-200 bg-white transition-shadow hover:shadow-md has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-orange">
       <div className="relative aspect-[16/9] bg-slate-100">
-        <CoverImage
-          src={mediaOr(application.imagePath, applicationPlaceholder(application.slug))}
-          alt=""
-          sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw" className="motion-safe:transition-transform motion-safe:duration-500 motion-safe:group-hover:scale-105"
-        />
+        {/* An uploaded photo wins; otherwise the animated drawing, else the default image. */}
+        {!application.imagePath && hasApplicationScene(application.slug) ? (
+          <ApplicationScene slug={application.slug} />
+        ) : (
+          <CoverImage
+            src={mediaOr(application.imagePath, applicationPlaceholder(application.slug))}
+            alt=""
+            sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
+            className="motion-safe:transition-transform motion-safe:duration-500 motion-safe:group-hover:scale-105"
+          />
+        )}
       </div>
       <div className="p-5">
         <Heading className="text-lg font-semibold text-navy">

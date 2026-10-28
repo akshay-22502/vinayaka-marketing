@@ -4,10 +4,11 @@ import { Footer } from "./Footer";
 import { GoogleAnalytics } from "./GoogleAnalytics";
 import { Header } from "./Header";
 import { QuoteFab } from "./QuoteFab";
+import { ScrollReveal } from "./ScrollReveal";
 
 /**
  * What every public page sits in: skip link, header, the page, footer and the floating quote button,
- * plus the Google Analytics tag when a Measurement ID is set (so the admin area never loads it).
+ * the scroll animations, plus the Google Analytics tag when a Measurement ID is set (so the admin area never loads it).
  */
 export async function SiteFrame({ children }: { children: React.ReactNode }) {
   const [settings, nav] = await Promise.all([getSiteSettings(), getNavVisibility()]);
@@ -24,6 +25,7 @@ export async function SiteFrame({ children }: { children: React.ReactNode }) {
       </main>
       <Footer settings={settings} nav={nav} />
       <QuoteFab />
+      <ScrollReveal />
       {gaId ? <GoogleAnalytics measurementId={gaId} /> : null}
     </div>
   );

@@ -9,7 +9,6 @@ import { Presence } from "@/components/site/home/Presence";
 import { ProjectsStrip } from "@/components/site/home/ProjectsStrip";
 import { WhyUs } from "@/components/site/home/WhyUs";
 import { QuoteCta } from "@/components/site/QuoteCta";
-import { ScrollReveal } from "@/components/site/ScrollReveal";
 import {
   getApplications,
   getCategories,
@@ -62,7 +61,6 @@ export default async function HomePage() {
           text="Send your product needs, quantities and delivery location. We reply with recommendations and a quotation."
         />
       </div>
-      <ScrollReveal />
     </>
   );
 }

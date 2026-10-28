@@ -194,3 +194,148 @@ html {
     transition-delay: calc(var(--reveal-delay, 0ms) + 250ms);
   }
 }
+
+/* Application scenes (components/site/ApplicationScene.tsx). ScrollReveal sets
+   data-scene-state="ready" (held on the first frame) and then "play" once the scene is in view.
+   Without that attribute nothing is animated and the finished drawing shows. */
+@media (prefers-reduced-motion: no-preference) {
+  [data-scene-state] :is(.sc-draw, .sc-drop, .sc-grow-x, .sc-grow-y, .sc-fade, .sc-pop) {
+    animation-duration: 800ms;
+    animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+    animation-fill-mode: both;
+    animation-delay: var(--d, 0s);
+    animation-play-state: paused;
+  }
+  [data-scene-state] :is(.sc-drive, .sc-rain, .sc-wave) {
+    animation-delay: var(--d, 0s);
+    animation-iteration-count: infinite;
+    animation-timing-function: linear;
+    animation-fill-mode: backwards;
+    animation-play-state: paused;
+  }
+  [data-scene-state="play"] :is(.sc-draw, .sc-drop, .sc-grow-x, .sc-grow-y, .sc-fade, .sc-pop, .sc-drive, .sc-rain, .sc-wave) {
+    animation-play-state: running;
+  }
+  [data-scene-state] .sc-draw {
+    animation-name: sc-draw;
+    stroke-dasharray: 1;
+  }
+  [data-scene-state] .sc-drop {
+    animation-name: sc-drop;
+  }
+  [data-scene-state] :is(.sc-grow-x, .sc-grow-y, .sc-pop) {
+    transform-box: fill-box;
+  }
+  [data-scene-state] .sc-grow-x {
+    animation-name: sc-grow-x;
+    transform-origin: left center;
+  }
+  [data-scene-state] .sc-grow-y {
+    animation-name: sc-grow-y;
+    transform-origin: center bottom;
+  }
+  [data-scene-state] .sc-pop {
+    animation-name: sc-pop;
+    transform-origin: center;
+  }
+  [data-scene-state] .sc-fade {
+    animation-name: sc-fade;
+  }
+  [data-scene-state] .sc-drive {
+    animation-name: sc-drive;
+    animation-duration: 6s;
+  }
+  [data-scene-state] .sc-rain {
+    animation-name: sc-rain;
+    animation-duration: 1.4s;
+  }
+  [data-scene-state] .sc-wave {
+    animation-name: sc-wave;
+    animation-duration: 3s;
+    animation-timing-function: ease-in-out;
+    animation-direction: alternate;
+  }
+}
+
+@keyframes sc-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes sc-drop {
+  from {
+    opacity: 0;
+    transform: translateY(-40px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes sc-grow-x {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: none;
+  }
+}
+@keyframes sc-grow-y {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: none;
+  }
+}
+@keyframes sc-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes sc-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+/* Drives from off the left edge to off the right edge of the 320-wide scene. */
+@keyframes sc-drive {
+  from {
+    transform: translateX(-260px);
+  }
+  to {
+    transform: translateX(260px);
+  }
+}
+@keyframes sc-rain {
+  from {
+    opacity: 0;
+    transform: translateY(0);
+  }
+  20% {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(120px);
+  }
+}
+@keyframes sc-wave {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-16px);
+  }
+}
