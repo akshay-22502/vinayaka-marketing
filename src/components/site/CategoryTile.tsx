@@ -20,7 +20,7 @@ export function CategoryTile({ category, headingLevel = 3 }: Props) {
       className="group relative flex h-full flex-col overflow-hidden rounded-xl border border-slate-200 bg-white transition-shadow hover:shadow-md has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-orange"
     >
       <div className="relative aspect-[4/3] bg-slate-100">
-        <CoverImage src={src} alt="" sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw" />
+        <CoverImage src={src} alt="" sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw" className="motion-safe:transition-transform motion-safe:duration-500 motion-safe:group-hover:scale-105" />
       </div>
       <div className="flex flex-1 flex-col border-t-4 border-orange p-5">
         <Heading className="text-xl font-bold text-navy">

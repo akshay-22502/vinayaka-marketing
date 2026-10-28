@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { cache } from "react";
+import { ApplicationScene, hasApplicationScene } from "@/components/site/ApplicationScene";
 import { Breadcrumb } from "@/components/site/Breadcrumb";
 import { CoverImage } from "@/components/site/CoverImage";
 import { Markdown } from "@/components/site/Markdown";
@@ -59,12 +60,16 @@ export default async function ApplicationPage({ params }: Props) {
       </div>
 
       <div className="relative mt-8 aspect-[16/9] overflow-hidden rounded-xl border border-slate-200 bg-slate-100 lg:aspect-[21/9]">
-        <CoverImage
-          src={photo ?? applicationPlaceholder(application.slug)}
-          alt={photo ? application.name : ""}
-          sizes="(min-width: 1152px) 1088px, 100vw"
-          priority
-        />
+        {!photo && hasApplicationScene(application.slug) ? (
+          <ApplicationScene slug={application.slug} />
+        ) : (
+          <CoverImage
+            src={photo ?? applicationPlaceholder(application.slug)}
+            alt={photo ? application.name : ""}
+            sizes="(min-width: 1152px) 1088px, 100vw"
+            priority
+          />
+        )}
       </div>
 
       {application.body.trim() !== "" ? (

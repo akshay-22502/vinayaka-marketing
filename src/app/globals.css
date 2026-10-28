@@ -68,3 +68,274 @@ html {
     @apply absolute left-2 top-2 z-[60] -translate-y-24 rounded-md bg-white px-4 py-2 text-sm font-semibold text-navy shadow-lg focus:translate-y-0;
   }
 }
+
+/* Hero layer stack (components/site/home/LayerStack.tsx). Layers drop in from the bottom up,
+   labels follow, then each geosynthetic lifts out in turn with its caption. Without motion the
+   finished stack is shown and the captions are hidden. */
+@media (prefers-reduced-motion: no-preference) {
+  .ls-drop {
+    animation: ls-drop 650ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+    animation-delay: calc(var(--order) * 220ms + 150ms);
+  }
+  .ls-label {
+    animation: ls-label 500ms ease-out both;
+    animation-delay: calc(var(--order) * 220ms + 450ms);
+  }
+  .ls-focus {
+    animation: ls-focus var(--focus-cycle) ease-in-out var(--focus-delay) infinite;
+  }
+  .ls-label-name {
+    animation: ls-label-name var(--focus-cycle) ease-in-out var(--focus-delay) infinite;
+  }
+  .ls-caption {
+    opacity: 0;
+    animation: ls-caption var(--focus-cycle) ease-in-out var(--focus-delay) infinite;
+  }
+}
+
+@keyframes ls-drop {
+  from {
+    opacity: 0;
+    transform: translateY(-90px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes ls-label {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* One cycle holds four products, so each is "on" for the first quarter of it. */
+@keyframes ls-focus {
+  0%,
+  25%,
+  100% {
+    transform: none;
+  }
+  4%,
+  21% {
+    transform: translateY(-12px);
+  }
+}
+
+@keyframes ls-label-name {
+  0%,
+  25%,
+  100% {
+    color: #ffffff;
+  }
+  4%,
+  21% {
+    color: var(--color-orange);
+  }
+}
+
+@keyframes ls-caption {
+  0%,
+  25%,
+  100% {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  4%,
+  21% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Hero text rises in on load. */
+@media (prefers-reduced-motion: no-preference) {
+  .rise-in {
+    animation: rise-in 700ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+    animation-delay: var(--rise-delay, 0ms);
+  }
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Scroll reveal (components/site/ScrollReveal.tsx). The script marks only what starts below the
+   fold as "hidden", so without JavaScript or with reduced motion nothing is ever hidden. */
+@media (prefers-reduced-motion: no-preference) {
+  [data-reveal="hidden"] {
+    opacity: 0;
+    transform: translateY(28px);
+  }
+  [data-reveal="shown"] {
+    transition:
+      opacity 700ms ease-out,
+      transform 700ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    transition-delay: var(--reveal-delay, 0ms);
+  }
+  [data-reveal="hidden"] .reveal-bar {
+    transform: scaleX(0);
+  }
+  [data-reveal="shown"] .reveal-bar {
+    transition: transform 900ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    transition-delay: calc(var(--reveal-delay, 0ms) + 250ms);
+  }
+}
+
+/* Application scenes (components/site/ApplicationScene.tsx). ScrollReveal sets
+   data-scene-state="ready" (held on the first frame) and then "play" once the scene is in view.
+   Without that attribute nothing is animated and the finished drawing shows. */
+@media (prefers-reduced-motion: no-preference) {
+  [data-scene-state] :is(.sc-draw, .sc-drop, .sc-grow-x, .sc-grow-y, .sc-fade, .sc-pop) {
+    animation-duration: 800ms;
+    animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+    animation-fill-mode: both;
+    animation-delay: var(--d, 0s);
+    animation-play-state: paused;
+  }
+  [data-scene-state] :is(.sc-drive, .sc-rain, .sc-wave) {
+    animation-delay: var(--d, 0s);
+    animation-iteration-count: infinite;
+    animation-timing-function: linear;
+    animation-fill-mode: backwards;
+    animation-play-state: paused;
+  }
+  [data-scene-state="play"] :is(.sc-draw, .sc-drop, .sc-grow-x, .sc-grow-y, .sc-fade, .sc-pop, .sc-drive, .sc-rain, .sc-wave) {
+    animation-play-state: running;
+  }
+  [data-scene-state] .sc-draw {
+    animation-name: sc-draw;
+    stroke-dasharray: 1;
+  }
+  [data-scene-state] .sc-drop {
+    animation-name: sc-drop;
+  }
+  [data-scene-state] :is(.sc-grow-x, .sc-grow-y, .sc-pop) {
+    transform-box: fill-box;
+  }
+  [data-scene-state] .sc-grow-x {
+    animation-name: sc-grow-x;
+    transform-origin: left center;
+  }
+  [data-scene-state] .sc-grow-y {
+    animation-name: sc-grow-y;
+    transform-origin: center bottom;
+  }
+  [data-scene-state] .sc-pop {
+    animation-name: sc-pop;
+    transform-origin: center;
+  }
+  [data-scene-state] .sc-fade {
+    animation-name: sc-fade;
+  }
+  [data-scene-state] .sc-drive {
+    animation-name: sc-drive;
+    animation-duration: 6s;
+  }
+  [data-scene-state] .sc-rain {
+    animation-name: sc-rain;
+    animation-duration: 1.4s;
+  }
+  [data-scene-state] .sc-wave {
+    animation-name: sc-wave;
+    animation-duration: 3s;
+    animation-timing-function: ease-in-out;
+    animation-direction: alternate;
+  }
+}
+
+@keyframes sc-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes sc-drop {
+  from {
+    opacity: 0;
+    transform: translateY(-40px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes sc-grow-x {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: none;
+  }
+}
+@keyframes sc-grow-y {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: none;
+  }
+}
+@keyframes sc-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes sc-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+/* Drives from off the left edge to off the right edge of the 320-wide scene. */
+@keyframes sc-drive {
+  from {
+    transform: translateX(-260px);
+  }
+  to {
+    transform: translateX(260px);
+  }
+}
+@keyframes sc-rain {
+  from {
+    opacity: 0;
+    transform: translateY(0);
+  }
+  20% {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(120px);
+  }
+}
+@keyframes sc-wave {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-16px);
+  }
+}

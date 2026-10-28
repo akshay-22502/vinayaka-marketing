@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Application } from "@/lib/content/types";
 import { ApplicationCard } from "../ApplicationCard";
 import { SectionHeading } from "../SectionHeading";
+import { revealProps } from "@/lib/reveal";
 
 const SHOWN = 6;
 
@@ -11,15 +12,17 @@ export function ApplicationsStrip({ applications }: { applications: Application[
   return (
     <section aria-labelledby="applications-heading" className="bg-slate-50 py-14 sm:py-20">
       <div className="container-page">
-        <SectionHeading
-          id="applications-heading"
-          eyebrow="Applications"
-          title="Where our products are used"
-          intro="From road bases to landfill liners, see which products suit your project."
-        />
+        <div {...revealProps()}>
+          <SectionHeading
+            id="applications-heading"
+            eyebrow="Applications"
+            title="Where our products are used"
+            intro="From road bases to landfill liners, see which products suit your project."
+          />
+        </div>
         <ul className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {applications.slice(0, SHOWN).map((application) => (
-            <li key={application.slug}>
+          {applications.slice(0, SHOWN).map((application, index) => (
+            <li key={application.slug} {...revealProps(index)}>
               <ApplicationCard application={application} />
             </li>
           ))}

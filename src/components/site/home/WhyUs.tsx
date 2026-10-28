@@ -1,4 +1,5 @@
 import { SectionHeading } from "../SectionHeading";
+import { revealProps } from "@/lib/reveal";
 
 const REASONS = [
   {
@@ -23,11 +24,14 @@ const REASONS = [
 export function WhyUs() {
   return (
     <section aria-labelledby="why-heading" className="container-page py-14 sm:py-20">
-      <SectionHeading id="why-heading" eyebrow="Why TerraTechBharat" title="Built for the people who specify and buy" />
+      <div {...revealProps()}>
+        <SectionHeading id="why-heading" eyebrow="Why TerraTechBharat" title="Built for the people who specify and buy" />
+      </div>
       <ul className="mt-10 grid gap-x-8 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">
-        {REASONS.map((reason) => (
-          <li key={reason.title} className="border-t-4 border-orange pt-5">
-            <h3 className="text-lg font-semibold text-navy">{reason.title}</h3>
+        {REASONS.map((reason, index) => (
+          <li key={reason.title} {...revealProps(index)}>
+            <span aria-hidden="true" className="reveal-bar block h-1 origin-left bg-orange" />
+            <h3 className="mt-5 text-lg font-semibold text-navy">{reason.title}</h3>
             <p className="mt-2 text-slate-600">{reason.text}</p>
           </li>
         ))}
