@@ -35,6 +35,8 @@ body {
    scrolls a focused element or an anchor into view, it stops short of that strip. */
 html {
   scroll-padding-bottom: 5rem;
+  /* The pinned header covers the top 4 to 4.5rem. */
+  scroll-padding-top: 5rem;
 }
 
 /* Keyboard focus: the brand orange ring is at least 3:1 against both white and navy. */
@@ -63,94 +65,52 @@ html {
     @apply border border-white/60 text-white hover:bg-white/10;
   }
 
+  /* A sideways-scrolling row that starts in line with .container-page content and runs to the
+     right edge of the screen. Snapping stops at the same inset. */
+  .rail {
+    --rail-pad: max(1rem, calc((100vw - 72rem) / 2 + 1rem));
+    padding-inline: var(--rail-pad) 1rem;
+    scroll-padding-inline-start: var(--rail-pad);
+    scrollbar-width: none;
+  }
+  .rail::-webkit-scrollbar {
+    display: none;
+  }
+  @media (min-width: 640px) {
+    .rail {
+      --rail-pad: max(1.5rem, calc((100vw - 72rem) / 2 + 1.5rem));
+    }
+  }
+  @media (min-width: 1024px) {
+    .rail {
+      --rail-pad: max(2rem, calc((100vw - 72rem) / 2 + 2rem));
+    }
+  }
+
   /* Hidden until it takes keyboard focus, then drops in at the top left. */
   .skip-link {
     @apply absolute left-2 top-2 z-[60] -translate-y-24 rounded-md bg-white px-4 py-2 text-sm font-semibold text-navy shadow-lg focus:translate-y-0;
   }
 }
 
-/* Hero layer stack (components/site/home/LayerStack.tsx). Layers drop in from the bottom up,
-   labels follow, then each geosynthetic lifts out in turn with its caption. Without motion the
-   finished stack is shown and the captions are hidden. */
+/* Pinned on large screens (PinnedRail): the script slides the rail, so it does not scroll or clip
+   itself. Outside the layers so it wins over the rail's overflow utilities. */
+[data-rail-pinned] .rail {
+  overflow: visible;
+  scroll-snap-type: none;
+  will-change: transform;
+}
+
+/* Stacking product cards (components/site/home/StackMotion.tsx sets --cover and --enter). */
 @media (prefers-reduced-motion: no-preference) {
-  .ls-drop {
-    animation: ls-drop 650ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
-    animation-delay: calc(var(--order) * 220ms + 150ms);
+  .stack-card {
+    transform: scale(calc(1 - var(--cover, 0) * 0.07));
+    transform-origin: 50% 0;
+    filter: brightness(calc(1 - var(--cover, 0) * 0.45));
+    will-change: transform, filter;
   }
-  .ls-label {
-    animation: ls-label 500ms ease-out both;
-    animation-delay: calc(var(--order) * 220ms + 450ms);
-  }
-  .ls-focus {
-    animation: ls-focus var(--focus-cycle) ease-in-out var(--focus-delay) infinite;
-  }
-  .ls-label-name {
-    animation: ls-label-name var(--focus-cycle) ease-in-out var(--focus-delay) infinite;
-  }
-  .ls-caption {
-    opacity: 0;
-    animation: ls-caption var(--focus-cycle) ease-in-out var(--focus-delay) infinite;
-  }
-}
-
-@keyframes ls-drop {
-  from {
-    opacity: 0;
-    transform: translateY(-90px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-@keyframes ls-label {
-  from {
-    opacity: 0;
-    transform: translateX(-12px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-/* One cycle holds four products, so each is "on" for the first quarter of it. */
-@keyframes ls-focus {
-  0%,
-  25%,
-  100% {
-    transform: none;
-  }
-  4%,
-  21% {
-    transform: translateY(-12px);
-  }
-}
-
-@keyframes ls-label-name {
-  0%,
-  25%,
-  100% {
-    color: #ffffff;
-  }
-  4%,
-  21% {
-    color: var(--color-orange);
-  }
-}
-
-@keyframes ls-caption {
-  0%,
-  25%,
-  100% {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-  4%,
-  21% {
-    opacity: 1;
-    transform: none;
+  .stack-card-image {
+    transform: scale(calc(1.14 - var(--enter, 1) * 0.14));
   }
 }
 

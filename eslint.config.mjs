@@ -18,6 +18,8 @@ const eslintConfig = [
       "out/**",
       "build/**",
       "next-env.d.ts",
+      // Stand-alone render scripts for the home page frames, run in their own folder.
+      "scripts/hero-render/**",
     ],
   },
 ];

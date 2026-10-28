@@ -2,13 +2,14 @@ import type { Metadata } from "next";
 import { cache } from "react";
 import { JsonLd } from "@/components/site/JsonLd";
 import { ApplicationsStrip } from "@/components/site/home/ApplicationsStrip";
-import { CategoryTiles } from "@/components/site/home/CategoryTiles";
 import { CertificationsStrip } from "@/components/site/home/CertificationsStrip";
-import { Hero } from "@/components/site/home/Hero";
+import { ClosingCta } from "@/components/site/home/ClosingCta";
 import { Presence } from "@/components/site/home/Presence";
+import { ProductLines } from "@/components/site/home/ProductLines";
 import { ProjectsStrip } from "@/components/site/home/ProjectsStrip";
+import { ScrollHero } from "@/components/site/home/ScrollHero";
+import { Statement } from "@/components/site/home/Statement";
 import { WhyUs } from "@/components/site/home/WhyUs";
-import { QuoteCta } from "@/components/site/QuoteCta";
 import {
   getApplications,
   getCategories,
@@ -16,7 +17,6 @@ import {
   getProjects,
   getSiteSettings,
 } from "@/lib/content/queries";
-import { revealProps } from "@/lib/reveal";
 import { metaDescription, organizationJsonLd, pageMetadata } from "@/lib/seo";
 
 export const revalidate = 3600;
@@ -48,19 +48,15 @@ export default async function HomePage() {
   return (
     <>
       <JsonLd data={organizationJsonLd()} />
-      <Hero tagline={settings.tagline} title={settings.heroTitle} text={settings.heroText} />
-      <CategoryTiles categories={categories} />
+      <ScrollHero tagline={settings.tagline} title={settings.heroTitle} text={settings.heroText} />
+      <ProductLines categories={categories} />
+      <Statement />
       <ApplicationsStrip applications={applications} />
       <WhyUs />
       <CertificationsStrip certifications={certifications} />
       <ProjectsStrip projects={projects} />
       <Presence settings={settings} />
-      <div {...revealProps()} className="container-page py-14 sm:py-20">
-        <QuoteCta
-          heading="Tell us about your project"
-          text="Send your product needs, quantities and delivery location. We reply with recommendations and a quotation."
-        />
-      </div>
+      <ClosingCta />
     </>
   );
 }

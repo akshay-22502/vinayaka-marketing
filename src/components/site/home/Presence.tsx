@@ -1,24 +1,22 @@
 import Link from "next/link";
 import type { SiteSettings } from "@/lib/content/types";
 import { OfficeDetails } from "../OfficeDetails";
-import { SectionHeading } from "../SectionHeading";
 import { revealProps } from "@/lib/reveal";
 
 /** Both offices side by side. */
 export function Presence({ settings }: { settings: SiteSettings }) {
   return (
-    <section aria-labelledby="presence-heading" className="bg-slate-50 py-14 sm:py-20">
+    <section aria-labelledby="presence-heading" className="bg-white py-20 sm:py-28">
       <div className="container-page">
-        <div {...revealProps()}>
-          <SectionHeading
-            id="presence-heading"
-            eyebrow="Where we work"
-            title="India and the UAE"
-            intro="Talk to the office closest to your project."
-          />
+        <div {...revealProps()} className="max-w-3xl">
+          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-orange-dark">Where we work</p>
+          <h2 id="presence-heading" className="mt-4 text-4xl font-semibold leading-[1.05] tracking-[-0.03em] text-navy sm:text-6xl">
+            India and the UAE.
+          </h2>
+          <p className="mt-5 text-lg leading-relaxed text-slate-600 sm:text-xl">Talk to the office closest to your project.</p>
         </div>
-        <div className="mt-10 grid gap-6 md:grid-cols-2">
-          <div {...revealProps(0)} className="rounded-xl border border-slate-200 bg-white p-6">
+        <div className="mt-12 grid gap-5 md:grid-cols-2">
+          <div {...revealProps(0)} className="rounded-[2rem] bg-[#f5f5f7] p-8 sm:p-10">
             <OfficeDetails
               title="India"
               address={settings.indiaAddress}
@@ -27,7 +25,7 @@ export function Presence({ settings }: { settings: SiteSettings }) {
               email={settings.indiaEmail}
             />
           </div>
-          <div {...revealProps(1)} className="rounded-xl border border-slate-200 bg-white p-6">
+          <div {...revealProps(1)} className="rounded-[2rem] bg-[#f5f5f7] p-8 sm:p-10">
             <OfficeDetails
               title="UAE"
               address={settings.uaeAddress}
