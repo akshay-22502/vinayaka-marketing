@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { type ReactNode, useEffect, useRef, useState } from "react";
+import { preload } from "react-dom";
 import { HERO_FRAMES, heroFrameUrl, type HeroSet } from "@/lib/hero-frames";
 import { STORIES, type StoryScene } from "@/lib/scroll-stories";
 
@@ -35,6 +36,12 @@ function loadOrder(count: number) {
   if (!seen.has(count - 1)) order.splice(1, 0, count - 1);
   return order;
 }
+
+/** Frames fetched from the HTML itself, before the script runs: the first, coarse pass. */
+const PRELOAD_COUNT = 6;
+
+/** Requests in flight at once. HTTP/2 serves them over one connection. */
+const PARALLEL = 8;
 
 /**
  * Opening banner that tells a product's story. While it is pinned, scrolling plays a rendered 3D
@@ -89,18 +96,20 @@ export function ScrollStory({ scene, labelledBy, intro, endLinks }: Props) {
         if (cancelled || forSet !== set || next >= order.length) return;
         const index = order[next++];
         const img = new Image();
-        img.decoding = "async";
-        img.onload = () => {
-          if (forSet !== set) return;
-          images[index] = img;
-          shown = -1;
-          schedule();
-          pump();
-        };
-        img.onerror = pump;
         img.src = heroFrameUrl(scene, forSet, index);
+        // Decoded before it is used, so drawing it while scrolling never waits on decoding.
+        img
+          .decode()
+          .then(() => {
+            if (forSet !== set) return;
+            images[index] = img;
+            shown = -1;
+            schedule();
+          })
+          .catch(() => {})
+          .finally(pump);
       };
-      for (let k = 0; k < 4; k++) pump();
+      for (let k = 0; k < PARALLEL; k++) pump();
     }
 
     function nearestLoaded(i: number) {
@@ -203,6 +212,17 @@ export function ScrollStory({ scene, labelledBy, intro, endLinks }: Props) {
   }, [mode, scene, beats]);
 
   const scroll = mode === "scroll";
+
+  // Start fetching the coarse frames with the page, so they are cached when the script asks.
+  for (const set of ["port", "land"] as const) {
+    const { count } = HERO_FRAMES[set];
+    for (const index of loadOrder(count).slice(1, PRELOAD_COUNT))
+      preload(heroFrameUrl(scene, set, index), {
+        as: "image",
+        fetchPriority: "low",
+        media: set === "port" ? "(orientation: portrait)" : "(orientation: landscape)",
+      });
+  }
 
   return (
     <section
