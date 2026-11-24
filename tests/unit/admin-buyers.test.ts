@@ -2,9 +2,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   NOTE_EMPTY_MESSAGE,
   buyerNoteSchema,
+  buyerPlace,
   buyerSchema,
   buyersHref,
   containsPattern,
+  distinctCities,
   newBuyerSchema,
   parseBuyerFilters,
   websiteHref,
@@ -54,13 +56,20 @@ beforeEach(() => {
 
 describe("parseBuyerFilters and buyersHref", () => {
   it("reads known values and ignores the rest", () => {
-    expect(parseBuyerFilters({ country: "AE", status: "in_discussion", q: "  dutco ", page: "2" })).toEqual({
+    expect(parseBuyerFilters({ country: "AE", city: " Dubai ", status: "in_discussion", q: "  dutco ", page: "2" })).toEqual({
       country: "AE",
+      city: "Dubai",
       status: "in_discussion",
       q: "dutco",
       page: 2,
     });
-    expect(parseBuyerFilters({ country: "US", status: "__proto__", page: "-1" })).toEqual({ country: null, status: null, q: "", page: 1 });
+    expect(parseBuyerFilters({ country: "US", status: "__proto__", page: "-1" })).toEqual({
+      country: null,
+      city: "",
+      status: null,
+      q: "",
+      page: 1,
+    });
     expect(parseBuyerFilters({ q: "x".repeat(300) }).q).toHaveLength(100);
   });
 
@@ -70,6 +79,24 @@ describe("parseBuyerFilters and buyersHref", () => {
       "/admin/buyers?country=IN&status=onboarded&q=L%26T&page=3",
     );
     expect(buyersHref({ country: null, page: 1 })).toBe("/admin/buyers");
+    expect(buyersHref({ country: "IN", city: "Jaipur", q: "infra" })).toBe("/admin/buyers?country=IN&city=Jaipur&q=infra");
+    expect(buyersHref({ city: "" })).toBe("/admin/buyers");
+  });
+
+  it("lists each city once, A to Z, without blanks", () => {
+    expect(distinctCities([{ city: "Jaipur" }, { city: "" }, { city: "ahmedabad" }, { city: " Jaipur " }, { city: null }, { city: "Udaipur" }])).toEqual([
+      "ahmedabad",
+      "Jaipur",
+      "Udaipur",
+    ]);
+  });
+
+  it("writes a buyer's place without repeating a part", () => {
+    expect(buyerPlace({ location: "Deira", city: "Dubai", state: "Dubai" }, "United Arab Emirates (UAE)")).toBe(
+      "Deira, Dubai, United Arab Emirates (UAE)",
+    );
+    expect(buyerPlace({ location: "", city: "Jaipur", state: "Rajasthan" }, "India")).toBe("Jaipur, Rajasthan, India");
+    expect(buyerPlace({ location: "", city: "", state: "" }, "India")).toBe("India");
   });
 
   it("makes a search match only what was typed", () => {
@@ -98,8 +125,14 @@ describe("buyer schemas", () => {
       ok: false,
       errors: { company: "Enter the company name", country: "Choose a country" },
     });
-    const parsed = parseForm(newBuyerSchema, form({ company: " Dutco ", country: "AE", status: "contacted", priority: "high" }));
-    expect(parsed).toMatchObject({ ok: true, data: { company: "Dutco", country: "AE", status: "contacted", priority: "high", email: "" } });
+    const parsed = parseForm(
+      newBuyerSchema,
+      form({ company: " Dutco ", country: "AE", status: "contacted", priority: "high", city: " Dubai ", state: "Dubai" }),
+    );
+    expect(parsed).toMatchObject({
+      ok: true,
+      data: { company: "Dutco", country: "AE", status: "contacted", priority: "high", email: "", city: "Dubai", state: "Dubai", location: "" },
+    });
   });
 
   it("an existing buyer's details never carry a status, and a blank priority is null", () => {
