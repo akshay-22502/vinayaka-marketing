@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { BuyerListControls } from "@/components/admin/BuyerListControls";
 import { BuyerStatusBadge } from "@/components/admin/BuyerStatusBadge";
 import { PageHeader } from "@/components/admin/PageHeader";
 import {
@@ -7,8 +8,10 @@ import {
   BUYER_PRIORITY_LABELS,
   BUYER_STATUSES,
   BUYER_STATUS_LABELS,
+  buyerPlace,
   buyersHref,
   containsPattern,
+  distinctCities,
   parseBuyerFilters,
   type BuyerPriority,
 } from "@/lib/admin/buyers";
@@ -27,15 +30,13 @@ type BuyerListRow = {
   country: Country;
   buyer_type: string;
   location: string;
+  city: string;
+  state: string;
   priority: BuyerPriority | null;
   status: string;
 };
 
-const LIST_COLUMNS = "id, company, country, buyer_type, location, priority, status";
-
-// Same look as the admin form fields (Field.tsx is a client module, so its class is not imported here).
-const searchInput =
-  "mt-1.5 block min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-base text-slate-900 shadow-sm";
+const LIST_COLUMNS = "id, company, country, buyer_type, location, city, state, priority, status";
 const cell = "px-3 py-3 align-top text-sm text-slate-700";
 const headCell = "px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-slate-700";
 const pill = "inline-flex min-h-11 items-center rounded-full border px-4 text-sm font-semibold";
@@ -65,9 +66,18 @@ export default async function BuyersPage({ searchParams }: Props) {
   const { supabase } = await requireAdmin();
   const filters = parseBuyerFilters(await searchParams);
 
+  // The City filter offers the cities of the chosen country (or of every buyer). A failed lookup
+  // only leaves the filter with "All cities".
+  let cityQuery = supabase.from("wholesale_buyers").select("city").neq("city", "");
+  if (filters.country) cityQuery = cityQuery.eq("country", filters.country);
+  const cityRows = await cityQuery;
+  if (cityRows.error) console.error("Could not load the buyer cities", cityRows.error);
+  const cities = distinctCities((cityRows.data ?? []) as { city: string }[]);
+
   // Counted first, so a page past the end can be pulled back to the last page.
   let countQuery = supabase.from("wholesale_buyers").select("id", { count: "exact", head: true });
   if (filters.country) countQuery = countQuery.eq("country", filters.country);
+  if (filters.city) countQuery = countQuery.eq("city", filters.city);
   if (filters.status) countQuery = countQuery.eq("status", filters.status);
   if (filters.q) countQuery = countQuery.ilike("company", containsPattern(filters.q));
   const counted = await countQuery;
@@ -81,6 +91,7 @@ export default async function BuyersPage({ searchParams }: Props) {
   // By company name; the id breaks ties so a buyer never moves between pages.
   let listQuery = supabase.from("wholesale_buyers").select(LIST_COLUMNS).order("company").order("id").range(from, to);
   if (filters.country) listQuery = listQuery.eq("country", filters.country);
+  if (filters.city) listQuery = listQuery.eq("city", filters.city);
   if (filters.status) listQuery = listQuery.eq("status", filters.status);
   if (filters.q) listQuery = listQuery.ilike("company", containsPattern(filters.q));
   const listed = await listQuery;
@@ -104,7 +115,7 @@ export default async function BuyersPage({ searchParams }: Props) {
     }
   }
 
-  const anyFilter = filters.country !== null || filters.status !== null || filters.q !== "";
+  const anyFilter = filters.country !== null || filters.city !== "" || filters.status !== null || filters.q !== "";
 
   return (
     <>
@@ -118,27 +129,15 @@ export default async function BuyersPage({ searchParams }: Props) {
         }
       />
 
-      <form action="/admin/buyers" method="get" role="search" className="mt-6 flex max-w-xl flex-wrap items-end gap-2">
-        {filters.country ? <input type="hidden" name="country" value={filters.country} /> : null}
-        {filters.status ? <input type="hidden" name="status" value={filters.status} /> : null}
-        <div className="min-w-0 flex-1">
-          <label htmlFor="buyer-search" className="text-sm font-semibold text-slate-800">
-            Search by company
-          </label>
-          <input id="buyer-search" name="q" type="search" defaultValue={filters.q} maxLength={100} className={searchInput} />
-        </div>
-        <button type="submit" className="btn btn-secondary">
-          Search
-        </button>
-      </form>
+      <BuyerListControls filters={filters} cities={cities} />
 
       <div className="mt-4 space-y-2">
         <FilterGroup label="Country">
-          <FilterLink href={buyersHref({ ...filters, country: null, page: 1 })} active={filters.country === null}>
+          <FilterLink href={buyersHref({ ...filters, country: null, city: "", page: 1 })} active={filters.country === null}>
             All countries
           </FilterLink>
           {BUYER_COUNTRIES.map((country) => (
-            <FilterLink key={country} href={buyersHref({ ...filters, country, page: 1 })} active={filters.country === country}>
+            <FilterLink key={country} href={buyersHref({ ...filters, country, city: "", page: 1 })} active={filters.country === country}>
               {countryName(country)}
             </FilterLink>
           ))}
@@ -205,7 +204,7 @@ export default async function BuyersPage({ searchParams }: Props) {
                         <Link href={`/admin/buyers/${row.id}`} className="font-semibold text-navy underline underline-offset-4 hover:text-navy/80">
                           {row.company}
                         </Link>
-                        <span className="mt-1 block text-xs text-slate-600">{[row.location, countryName(row.country)].filter(Boolean).join(", ")}</span>
+                        <span className="mt-1 block text-xs text-slate-600">{buyerPlace(row, countryName(row.country))}</span>
                       </td>
                       <td className={`${cell} hidden sm:table-cell`}>{countryName(row.country)}</td>
                       <td className={`${cell} hidden min-w-0 [overflow-wrap:anywhere] md:table-cell`}>{row.buyer_type || "–"}</td>

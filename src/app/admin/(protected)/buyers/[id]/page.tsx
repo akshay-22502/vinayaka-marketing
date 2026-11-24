@@ -13,6 +13,7 @@ import {
   BUYER_PRIORITY_LABELS,
   BUYER_STATUSES,
   BUYER_STATUS_LABELS,
+  buyerPlace,
   websiteHref,
 } from "@/lib/admin/buyers";
 import { safeMailto } from "@/lib/admin/quote-view";
@@ -32,6 +33,8 @@ type BuyerRow = {
   buyer_type: string;
   interested_in: string;
   location: string;
+  city: string;
+  state: string;
   contact_person: string;
   phone: string;
   mobile: string;
@@ -47,7 +50,7 @@ type BuyerRow = {
 type NoteRow = { id: string; body: string; status: string | null; created_at: string };
 
 const COLUMNS =
-  "id, company, country, buyer_type, interested_in, location, contact_person, phone, mobile, email, website, priority, status, source, created_at, updated_at";
+  "id, company, country, buyer_type, interested_in, location, city, state, contact_person, phone, mobile, email, website, priority, status, source, created_at, updated_at";
 
 const COUNTRY_OPTIONS = [
   { value: "", label: "Choose a country" },
@@ -84,7 +87,9 @@ function BuyerFields({ buyer }: { buyer: BuyerRow | null }) {
         maxLength={1000}
         defaultValue={buyer?.interested_in}
       />
-      <Field label="Location" name="location" maxLength={200} defaultValue={buyer?.location} hint="City and state, or emirate and area." />
+      <Field label="City" name="city" maxLength={100} defaultValue={buyer?.city} hint="For example Ahmedabad or Dubai. The buyers list filters by it." />
+      <Field label="State / emirate" name="state" maxLength={100} defaultValue={buyer?.state} hint="For example Gujarat or Sharjah." />
+      <Field label="Area / address" name="location" maxLength={200} defaultValue={buyer?.location} hint="Optional: the area or street address." />
       <Field label="Contact person" name="contact_person" maxLength={200} defaultValue={buyer?.contact_person} />
       <Field label="Phone" name="phone" type="tel" inputMode="tel" maxLength={100} defaultValue={buyer?.phone} />
       <Field
@@ -140,7 +145,7 @@ export default async function BuyerPage({ params }: Props) {
   const whatsapp = whatsappHref(buyer.mobile);
   const mailto = safeMailto(buyer.email);
   const website = websiteHref(buyer.website);
-  const place = [buyer.location, countryName(buyer.country)].filter(Boolean).join(", ");
+  const place = buyerPlace(buyer, countryName(buyer.country));
 
   // Everything here is shown as plain text by React (escaped); links are only made from values that passed a strict check.
   return (

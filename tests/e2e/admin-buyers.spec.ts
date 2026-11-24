@@ -117,3 +117,40 @@ test("the buyer list and page do not scroll sideways on a phone", async ({ page 
   await expect(rowLink(page, name)).toBeVisible();
   await expectNoHorizontalScroll(page);
 });
+
+test("the list searches as you type and filters by a city of the chosen country", async ({ page }) => {
+  const jaipur = company("jaipur");
+  const dubai = company("dubai");
+  const { error } = await service()
+    .from("wholesale_buyers")
+    .insert([
+      { company: jaipur, country: "IN", city: `Jaipur ${RUN}`, state: "Rajasthan", location: "" },
+      { company: dubai, country: "AE", city: `Dubai ${RUN}`, state: "Dubai", location: "Deira" },
+    ]);
+  expect(error).toBeNull();
+
+  // Typing is enough: there is no Search button to press.
+  await page.goto("/admin/buyers");
+  await expect(page.getByRole("button", { name: "Search" })).toHaveCount(0);
+  await page.getByLabel("Search by company").pressSequentially(`jaipur ${RUN}`);
+  await expect(page).toHaveURL(new RegExp(`q=jaipur(\\+|%20)${RUN}`));
+  await expect(rowLink(page, jaipur)).toBeVisible();
+  await expect(rowLink(page, dubai)).toHaveCount(0);
+  await expect(page.getByLabel("Search by company")).toBeFocused();
+
+  // The City filter offers only the chosen country's cities.
+  await page.goto("/admin/buyers?country=IN");
+  const city = page.getByLabel("City");
+  await expect(city.locator("option", { hasText: `Jaipur ${RUN}` })).toHaveCount(1);
+  await expect(city.locator("option", { hasText: `Dubai ${RUN}` })).toHaveCount(0);
+  await city.selectOption({ label: `Jaipur ${RUN}` });
+  await expect(page).toHaveURL(/country=IN&city=Jaipur/);
+  await expect(rowLink(page, jaipur)).toBeVisible();
+  await expect(rowOf(page, jaipur)).toContainText(`Jaipur ${RUN}, Rajasthan, India`);
+
+  // Picking another country clears the city.
+  await page.getByRole("main").getByRole("link", { name: "UAE", exact: true }).click();
+  await expect(page).toHaveURL(/country=AE$/);
+  await expect(page.getByLabel("City")).toHaveValue("");
+  await expect(rowOf(page, dubai)).toContainText(`Deira, Dubai ${RUN}, Dubai`);
+});

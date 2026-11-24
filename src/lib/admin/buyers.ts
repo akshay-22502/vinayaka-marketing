@@ -30,10 +30,15 @@ export const BUYER_NOTE_MAX = 5000;
 /** The longest search text; anything after it is ignored. */
 const SEARCH_MAX = 100;
 
-// List filters (?country=, ?status=, ?q=, ?page=) ------------------------------------------
+/** The longest city name in a filter; longer values are not a city we have. */
+const CITY_MAX = 100;
+
+// List filters (?country=, ?city=, ?status=, ?q=, ?page=) ----------------------------------
 
 export type BuyerFilters = {
   country: Country | null;
+  /** A city exactly as stored on buyers, or "" for every city. */
+  city: string;
   status: BuyerStatus | null;
   /** Part of a company name, or "" for no search. */
   q: string;
@@ -58,6 +63,7 @@ export function parseBuyerFilters(params: SearchParams): BuyerFilters {
   const page = rawPage !== undefined && PAGE_PATTERN.test(rawPage) ? Number(rawPage) : 0;
   return {
     country: oneOf(BUYER_COUNTRIES, firstValue(params.country)),
+    city: (firstValue(params.city) ?? "").trim().slice(0, CITY_MAX),
     status: oneOf(BUYER_STATUSES, firstValue(params.status)),
     q: (firstValue(params.q) ?? "").trim().slice(0, SEARCH_MAX),
     page: page >= 1 ? page : 1,
@@ -68,11 +74,35 @@ export function parseBuyerFilters(params: SearchParams): BuyerFilters {
 export function buyersHref(filters: Partial<BuyerFilters>): string {
   const query = new URLSearchParams();
   if (filters.country) query.set("country", filters.country);
+  if (filters.city) query.set("city", filters.city);
   if (filters.status) query.set("status", filters.status);
   if (filters.q) query.set("q", filters.q);
   if (filters.page && filters.page > 1) query.set("page", String(filters.page));
   const text = query.toString();
   return text ? `/admin/buyers?${text}` : "/admin/buyers";
+}
+
+/**
+ * The distinct cities of these buyer rows, A to Z, without blanks. Feeds the City filter, which is
+ * narrowed to the chosen country by the query that loads the rows.
+ */
+export function distinctCities(rows: readonly { city: string | null }[]): string[] {
+  const seen = new Map<string, string>();
+  for (const row of rows) {
+    const city = (row.city ?? "").trim();
+    if (city !== "" && !seen.has(city.toLowerCase())) seen.set(city.toLowerCase(), city);
+  }
+  return [...seen.values()].sort((a, b) => a.localeCompare(b, "en", { sensitivity: "base" }));
+}
+
+/** Where a buyer is, for the list and the buyer page: "Deira, Dubai, UAE". */
+export function buyerPlace(parts: { location: string; city: string; state: string }, country: string): string {
+  const out: string[] = [];
+  for (const part of [parts.location, parts.city, parts.state, country]) {
+    const text = part.trim();
+    if (text !== "" && !out.some((existing) => existing.toLowerCase() === text.toLowerCase())) out.push(text);
+  }
+  return out.join(", ");
 }
 
 /** A search text as an ILIKE pattern that matches it anywhere: %, _ and \ match only themselves. */
@@ -110,7 +140,9 @@ const buyerFields = {
   country: z.enum(BUYER_COUNTRIES, { error: "Choose a country" }),
   buyer_type: line("Type", 120),
   interested_in: paragraphs("What they would buy", 1000),
-  location: line("Location", 200),
+  city: line("City", 100),
+  state: line("State / emirate", 100),
+  location: line("Area / address", 200),
   contact_person: line("Contact person", 200),
   phone: line("Phone", 100),
   mobile: line("Mobile / WhatsApp", 100),
